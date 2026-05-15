@@ -1,0 +1,38 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  target_transform: log1p
+  features:
+    calendar: false
+    known_d1: false
+    target_lags: []
+    rolling_windows: []
+    cross_movement_known:
+      enabled: false
+prediction_intervals_coverage: [0.8, 0.95]
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: auto_arima
+    custom_name: native_intervals
+  - name: sarima
+    custom_name: native_intervals
+  - name: theta
+    custom_name: native_intervals
+  - name: tbats
+    custom_name: native_intervals
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

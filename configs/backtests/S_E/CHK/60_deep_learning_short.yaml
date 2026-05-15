@@ -1,0 +1,98 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: false
+    known_d1: false
+    target_lags: []
+    rolling_windows: []
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2026-02-01"
+  cutoff_end: "2026-02-14"
+  train_window_days: 365
+  log_every_n_cutoffs: 1
+
+models:
+  - name: nbeats
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      dataset_params:
+        max_encoder_length: 28
+      trainer_params:
+        max_epochs: 5
+  - name: neuralforecast_rnn
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      max_steps: 50
+      input_size: 28
+      inference_input_size: 28
+      batch_size: 32
+      num_workers_loader: 0
+  - name: neuralforecast_lstm
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      max_steps: 50
+      input_size: 28
+      inference_input_size: 28
+      batch_size: 32
+      num_workers_loader: 0
+  - name: pytorch_forecasting_tft
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      dataset_params:
+        max_encoder_length: 28
+      trainer_params:
+        max_epochs: 5
+        accelerator: cpu
+        enable_checkpointing: false
+        enable_progress_bar: false
+        logger: false
+  - name: pytorch_forecasting_deepar
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      dataset_params:
+        max_encoder_length: 28
+      trainer_params:
+        max_epochs: 5
+        accelerator: cpu
+        enable_checkpointing: false
+        enable_progress_bar: false
+        logger: false
+  - name: pytorch_forecasting_nhits
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      dataset_params:
+        max_encoder_length: 28
+      trainer_params:
+        max_epochs: 5
+        accelerator: cpu
+        enable_checkpointing: false
+        enable_progress_bar: false
+        logger: false
+  - name: pykan_forecaster
+    custom_name: short_cpu
+    parameters:
+      min_observations: 29
+      fit_params:
+        steps: 20
+      val_size: 0.2
+      device: cpu
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

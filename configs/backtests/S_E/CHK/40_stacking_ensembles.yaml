@@ -1,0 +1,169 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: true
+    known_d1: true
+    target_lags: [1, 7, 14, 28]
+    rolling_windows:
+      - days: 7
+        aggregations: [mean]
+      - days: 28
+        aggregations: [mean, std, non_zero_ratio]
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: stacking_ensemble
+    custom_name: lgb_xgb_tbats_ridge
+    parameters:
+      anchor_model_alias: lgb
+      oof:
+        max_folds: 5
+        min_train_window_days: 90
+        validation_window_days: 14
+        step_days: 14
+        min_oof_rows: 30
+      base_models:
+        - alias: lgb
+          name: lightgbm_regressor
+          parameters:
+            n_estimators: 300
+            num_leaves: 31
+            learning_rate: 0.03
+            random_state: 0
+            n_jobs: 1
+            verbosity: -1
+        - alias: xgb
+          name: xgboost_regressor
+          parameters:
+            n_estimators: 200
+            max_depth: 3
+            learning_rate: 0.03
+            objective: reg:squarederror
+            random_state: 0
+            n_jobs: 1
+            verbosity: 0
+        - alias: tbats
+          name: tbats
+          dataset:
+            history_window_days: 365
+            target_transform: log1p
+            features:
+              calendar: false
+              known_d1: false
+              target_lags: []
+              rolling_windows: []
+              cross_movement_known:
+                enabled: false
+      meta_model:
+        name: sklearn_ridge_regressor
+        parameters:
+          alpha: 1.0
+      passthrough_features: false
+  - name: stacking_ensemble
+    custom_name: lgb_tweedie_xgb_ridge
+    parameters:
+      anchor_model_alias: lgb
+      oof:
+        max_folds: 5
+        min_train_window_days: 90
+        validation_window_days: 14
+        step_days: 14
+        min_oof_rows: 30
+      base_models:
+        - alias: lgb
+          name: lightgbm_regressor
+          parameters:
+            n_estimators: 300
+            num_leaves: 31
+            learning_rate: 0.03
+            random_state: 0
+            n_jobs: 1
+            verbosity: -1
+        - alias: lgb_tweedie
+          name: lightgbm_regressor
+          parameters:
+            objective: tweedie
+            n_estimators: 500
+            num_leaves: 63
+            learning_rate: 0.03
+            random_state: 0
+            n_jobs: 1
+            verbosity: -1
+        - alias: xgb
+          name: xgboost_regressor
+          parameters:
+            n_estimators: 200
+            max_depth: 3
+            learning_rate: 0.03
+            objective: reg:squarederror
+            random_state: 0
+            n_jobs: 1
+            verbosity: 0
+      meta_model:
+        name: sklearn_ridge_regressor
+        parameters:
+          alpha: 1.0
+      passthrough_features: false
+  - name: stacking_ensemble
+    custom_name: lgb_tweedie_xgb_ridge_passthrough
+    parameters:
+      anchor_model_alias: lgb
+      oof:
+        max_folds: 5
+        min_train_window_days: 90
+        validation_window_days: 14
+        step_days: 14
+        min_oof_rows: 30
+      base_models:
+        - alias: lgb
+          name: lightgbm_regressor
+          parameters:
+            n_estimators: 300
+            num_leaves: 31
+            learning_rate: 0.03
+            random_state: 0
+            n_jobs: 1
+            verbosity: -1
+        - alias: lgb_tweedie
+          name: lightgbm_regressor
+          parameters:
+            objective: tweedie
+            n_estimators: 500
+            num_leaves: 63
+            learning_rate: 0.03
+            random_state: 0
+            n_jobs: 1
+            verbosity: -1
+        - alias: xgb
+          name: xgboost_regressor
+          parameters:
+            n_estimators: 200
+            max_depth: 3
+            learning_rate: 0.03
+            objective: reg:squarederror
+            random_state: 0
+            n_jobs: 1
+            verbosity: 0
+      meta_model:
+        name: sklearn_ridge_regressor
+        parameters:
+          alpha: 1.0
+      passthrough_features: true
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

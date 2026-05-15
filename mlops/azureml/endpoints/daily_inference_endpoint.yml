@@ -1,0 +1,4 @@
+$schema: https://azuremlschemas.azureedge.net/latest/batchEndpoint.schema.json
+name: diapason-daily-inference
+description: Batch endpoint for Diapason D+1 cash-in forecasting.
+auth_mode: aad_token

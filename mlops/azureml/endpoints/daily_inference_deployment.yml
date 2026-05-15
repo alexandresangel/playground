@@ -1,0 +1,8 @@
+$schema: https://azuremlschemas.azureedge.net/latest/batchDeployment.schema.json
+name: daily-inference-v1
+endpoint_name: diapason-daily-inference
+description: Pipeline-component deployment for daily Diapason batch inference.
+type: pipeline
+component: ../pipelines/daily_inference_component.yml
+settings:
+  default_compute: azureml:cpu-cluster

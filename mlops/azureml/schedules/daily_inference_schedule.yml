@@ -1,0 +1,13 @@
+$schema: https://azuremlschemas.azureedge.net/latest/schedule.schema.json
+name: diapason_daily_inference_schedule
+display_name: Diapason daily inference schedule
+description: Template schedule for daily D+1 inference. Fill input paths before creation.
+trigger:
+  type: recurrence
+  frequency: day
+  interval: 1
+  schedule:
+    hours: [6]
+    minutes: [0]
+  time_zone: UTC
+create_job: ../pipelines/daily_inference.yml

@@ -1,0 +1,19 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: diapason_build_silver
+display_name: Build Silver Tables
+version: 1
+type: command
+description: Parse raw Bronze CSV files into technically validated Silver entity tables.
+inputs:
+  bronze_path:
+    type: uri_folder
+outputs:
+  silver_path:
+    type: uri_folder
+code: ../../../
+environment: azureml:diapason-forecasting-env@latest
+command: >-
+  python -m pip install -e .
+  && build-silver
+  --input-path ${{inputs.bronze_path}}
+  --output-path ${{outputs.silver_path}}

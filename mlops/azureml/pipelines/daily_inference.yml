@@ -1,0 +1,43 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: diapason_daily_inference
+description: Refresh Silver and Gold outputs, then run daily D+1 batch inference.
+settings:
+  default_compute: azureml:cpu-cluster
+inputs:
+  bronze_path:
+    type: uri_folder
+  ruleset_path:
+    type: uri_file
+  dataset_kind: tabular
+  cutoff_date:
+    type: string
+  train_window_days: 28
+  history_window_days: 90
+outputs:
+  forecast_path:
+    type: uri_folder
+jobs:
+  build_silver:
+    type: command
+    component: ../components/build_silver.yml
+    inputs:
+      bronze_path: ${{parent.inputs.bronze_path}}
+  build_gold:
+    type: command
+    component: ../components/build_gold.yml
+    inputs:
+      silver_path: ${{parent.jobs.build_silver.outputs.silver_path}}
+      ruleset_path: ${{parent.inputs.ruleset_path}}
+  run_inference:
+    type: command
+    component: ../components/run_inference.yml
+    inputs:
+      gold_path: ${{parent.jobs.build_gold.outputs.gold_path}}
+      ruleset_path: ${{parent.inputs.ruleset_path}}
+      dataset_kind: ${{parent.inputs.dataset_kind}}
+      cutoff_date: ${{parent.inputs.cutoff_date}}
+      train_window_days: ${{parent.inputs.train_window_days}}
+      history_window_days: ${{parent.inputs.history_window_days}}
+    outputs:
+      forecast_path: ${{parent.outputs.forecast_path}}

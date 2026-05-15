@@ -1,0 +1,32 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: false
+    known_d1: false
+    target_lags: []
+    rolling_windows: []
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: croston
+    custom_name: default
+  - name: imapa
+    custom_name: default
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

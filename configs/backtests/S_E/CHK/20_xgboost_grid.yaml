@@ -1,0 +1,82 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: true
+    known_d1: true
+    target_lags: [1, 7, 14, 28]
+    rolling_windows:
+      - days: 7
+        aggregations: [mean]
+      - days: 28
+        aggregations: [mean, std, non_zero_ratio]
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: xgboost_regressor
+    custom_name: xgb_depth2_lr003_squarederror
+    parameters:
+      n_estimators: 200
+      max_depth: 2
+      learning_rate: 0.03
+      objective: reg:squarederror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+  - name: xgboost_regressor
+    custom_name: xgb_depth3_lr003_squarederror
+    parameters:
+      n_estimators: 300
+      max_depth: 3
+      learning_rate: 0.03
+      objective: reg:squarederror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+  - name: xgboost_regressor
+    custom_name: xgb_depth5_lr003_squarederror
+    parameters:
+      n_estimators: 300
+      max_depth: 5
+      learning_rate: 0.03
+      objective: reg:squarederror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+  - name: xgboost_regressor
+    custom_name: xgb_depth3_lr005_pseudohuber
+    parameters:
+      n_estimators: 300
+      max_depth: 3
+      learning_rate: 0.05
+      objective: reg:pseudohubererror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+  - name: xgboost_regressor
+    custom_name: xgb_depth5_lr005_pseudohuber
+    parameters:
+      n_estimators: 300
+      max_depth: 5
+      learning_rate: 0.05
+      objective: reg:pseudohubererror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

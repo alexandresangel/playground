@@ -1,0 +1,46 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: false
+    known_d1: false
+    target_lags: [1, 7]
+    rolling_windows:
+      - days: 7
+        aggregations: [mean]
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: naive_last_day
+    custom_name: default
+  - name: seasonal_naive_weekly
+    custom_name: default
+  - name: moving_average
+    custom_name: window_7
+    parameters:
+      window_days: 7
+  - name: moving_average
+    custom_name: window_28
+    parameters:
+      window_days: 28
+  - name: moving_average
+    custom_name: window_90
+    parameters:
+      window_days: 90
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

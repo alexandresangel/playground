@@ -1,0 +1,175 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: true
+    known_d1: true
+    target_lags: [1, 7, 14, 28]
+    rolling_windows:
+      - days: 7
+        aggregations: [mean]
+      - days: 28
+        aggregations: [mean, std, non_zero_ratio]
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: occurrence_spike_cascade
+    custom_name: q85_soft
+    parameters:
+      spike:
+        method: training_quantile
+        quantile: 0.85
+        min_spike_rows: 10
+        min_normal_rows: 10
+      routing:
+        mode: soft
+      occurrence_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 200
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 200
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      normal_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          objective: tweedie
+          n_estimators: 500
+          num_leaves: 63
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+  - name: occurrence_spike_cascade
+    custom_name: q90_soft
+    parameters:
+      spike:
+        method: training_quantile
+        quantile: 0.90
+        min_spike_rows: 10
+        min_normal_rows: 10
+      routing:
+        mode: soft
+      occurrence_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      normal_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          objective: tweedie
+          n_estimators: 500
+          num_leaves: 63
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+  - name: occurrence_spike_cascade
+    custom_name: q95_hard
+    parameters:
+      spike:
+        method: training_quantile
+        quantile: 0.95
+        min_spike_rows: 5
+        min_normal_rows: 10
+      routing:
+        mode: hard
+        occurrence_threshold: 0.50
+        spike_threshold: 0.50
+      occurrence_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_model:
+        name: lightgbm_classifier
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      normal_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          n_estimators: 300
+          num_leaves: 31
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+      spike_magnitude_model:
+        name: lightgbm_regressor
+        parameters:
+          objective: tweedie
+          n_estimators: 500
+          num_leaves: 63
+          learning_rate: 0.03
+          random_state: 0
+          n_jobs: 1
+          verbosity: -1
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}

@@ -1,0 +1,26 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: diapason_training_backtesting
+description: Run a YAML-configured rolling-origin backtest.
+settings:
+  default_compute: azureml:cpu-cluster
+inputs:
+  config_path:
+    type: uri_file
+  gold_path:
+    type: uri_folder
+  ruleset_path:
+    type: uri_file
+outputs:
+  backtest_path:
+    type: uri_folder
+jobs:
+  run_backtest:
+    type: command
+    component: ../components/run_backtest.yml
+    inputs:
+      config_path: ${{parent.inputs.config_path}}
+      gold_path: ${{parent.inputs.gold_path}}
+      ruleset_path: ${{parent.inputs.ruleset_path}}
+    outputs:
+      backtest_path: ${{parent.outputs.backtest_path}}

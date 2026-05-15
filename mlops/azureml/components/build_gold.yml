@@ -1,0 +1,22 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: diapason_build_gold
+display_name: Build Gold Outputs
+version: 1
+type: command
+description: Apply versioned business rules to Silver tables and publish Gold outputs.
+inputs:
+  silver_path:
+    type: uri_folder
+  ruleset_path:
+    type: uri_file
+outputs:
+  gold_path:
+    type: uri_folder
+code: ../../../
+environment: azureml:diapason-forecasting-env@latest
+command: >-
+  python -m pip install -e .
+  && build-gold
+  --input-path ${{inputs.silver_path}}
+  --output-path ${{outputs.gold_path}}
+  --ruleset-path ${{inputs.ruleset_path}}

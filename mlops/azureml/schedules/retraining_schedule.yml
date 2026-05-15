@@ -1,0 +1,14 @@
+$schema: https://azuremlschemas.azureedge.net/latest/schedule.schema.json
+name: diapason_retraining_schedule
+display_name: Diapason retraining and backtesting schedule
+description: Template schedule for periodic retraining/backtesting. Fill input paths before creation.
+trigger:
+  type: recurrence
+  frequency: week
+  interval: 1
+  schedule:
+    weekdays: [monday]
+    hours: [6]
+    minutes: [30]
+  time_zone: UTC
+create_job: ../pipelines/training_backtesting.yml

@@ -1,0 +1,28 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: diapason_run_inference
+display_name: Run Daily Inference Placeholder
+version: 1
+type: command
+description: Placeholder component; daily inference CLI is not implemented yet.
+inputs:
+  gold_path:
+    type: uri_folder
+  ruleset_path:
+    type: uri_file
+  dataset_kind:
+    type: string
+  cutoff_date:
+    type: string
+  train_window_days:
+    type: integer
+  history_window_days:
+    type: integer
+    default: 90
+outputs:
+  forecast_path:
+    type: uri_folder
+code: ../../../
+environment: azureml:diapason-forecasting-env@latest
+command: >-
+  python -m pip install -e .
+  && python -c "raise SystemExit('Daily inference is not implemented yet. Use run-backtest for the local production PoC path.')"

@@ -1,0 +1,25 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: diapason_snapshot_dataset
+display_name: Snapshot Diagnostic Dataset
+version: 1
+type: command
+description: Write an optional one-sequence diagnostic dataset snapshot from a backtest config.
+inputs:
+  config_path:
+    type: uri_file
+  gold_path:
+    type: uri_folder
+  ruleset_path:
+    type: uri_file
+outputs:
+  dataset_snapshot_path:
+    type: uri_folder
+code: ../../../
+environment: azureml:diapason-forecasting-env@latest
+command: >-
+  python -m pip install -e .
+  && snapshot-dataset
+  --config-path ${{inputs.config_path}}
+  --input-path ${{inputs.gold_path}}
+  --ruleset-path ${{inputs.ruleset_path}}
+  --output-root ${{outputs.dataset_snapshot_path}}

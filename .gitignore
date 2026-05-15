@@ -1,0 +1,15 @@
+# Local/env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Data/artifacts
+data/
+reports/
+mlruns/
+*.parquet
+*.csv
+*.xlsx
+#*.yaml
+#*.yml

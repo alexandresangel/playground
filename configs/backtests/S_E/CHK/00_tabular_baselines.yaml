@@ -1,0 +1,53 @@
+input_path: data/gold
+output_path: data/backtests
+ruleset_path: configs/rulesets/loreal_cash_in_v1.yaml
+
+dataset:
+  history_window_days: 90
+  features:
+    calendar: true
+    known_d1: true
+    target_lags: [1, 7, 14, 28]
+    rolling_windows:
+      - days: 7
+        aggregations: [mean]
+      - days: 28
+        aggregations: [mean, std, non_zero_ratio]
+    cross_movement_known:
+      enabled: false
+log_level: INFO
+
+evaluation:
+  cutoff_start: "2023-01-01"
+  cutoff_end: "2026-02-28"
+  train_window_days: 365
+  log_every_n_cutoffs: 7
+
+models:
+  - name: known_amount_d1
+    custom_name: default
+  - name: lightgbm_regressor
+    custom_name: lgb_default
+    parameters:
+      n_estimators: 200
+      num_leaves: 31
+      learning_rate: 0.03
+      random_state: 0
+      n_jobs: 1
+      verbosity: -1
+  - name: xgboost_regressor
+    custom_name: xgb_default
+    parameters:
+      n_estimators: 200
+      max_depth: 3
+      learning_rate: 0.03
+      objective: reg:squarederror
+      random_state: 0
+      n_jobs: 1
+      verbosity: 0
+
+sequence:
+  entity: "OAE850"
+  currency: "EUR"
+  movement_type: "CHK+"
+  filters: {}
