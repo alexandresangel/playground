@@ -54,16 +54,6 @@ class Ruleset(BaseModel):
 
         return f"{self.name}:{self.version}"
 
-    @property
-    def sequence_columns(self) -> list[str]:
-        """Return the sequence-defining columns in their canonical order."""
-
-        return [
-            self.entity_column,
-            self.currency_column,
-            self.movement_scope_column,
-        ]
-
     def resolve_movement_scope(self, movement_type: str | None) -> str | None:
         """Resolve the output movement scope for one movement type."""
 

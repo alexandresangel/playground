@@ -79,8 +79,6 @@ class GoldBuildResult(DomainModel):
 
     realized_cash_in: pd.DataFrame
     known_movements_daily: pd.DataFrame
-    sequence_reference: pd.DataFrame
-    calendar_daily: pd.DataFrame
     manifest: BuildManifest
 
 
@@ -162,7 +160,6 @@ class DatasetBuildRequest(DomainModel):
     ruleset: Ruleset
     dataset: DatasetConfig
     cutoff_dates: list[date]
-    sequence_id: str = Field(min_length=1)
     label_as_of_date: date | None = None
     target_transformer: Any | None = None
 
@@ -189,14 +186,12 @@ class DatasetManifest(BaseModel):
     ruleset_id: str
     cutoff_dates: list[date]
     forecast_horizon_days: int = Field(default=1, ge=1)
-    sequence_id: str
     label_as_of_date: date | None = None
     feature_policy: str
     training_label_policy: str
     history_window_days: int = Field(ge=1)
     target_transform: Literal["none", "log1p", "box_cox", "yeo_johnson"] = "none"
     row_count: int = Field(ge=0)
-    sequence_count: int = Field(ge=0)
     feature_columns: list[str] = Field(default_factory=list)
     source_tables: list[str] = Field(default_factory=list)
 
@@ -268,8 +263,6 @@ class BacktestConfig(BaseModel):
 class BacktestRunReport(BaseModel):
     """Compact audit report for one persisted backtest run."""
 
-    sequence_id: str
-    sequence_identity: dict[str, Any] = Field(default_factory=dict)
     model_info: ModelInfo
     custom_name: str = Field(min_length=1)
     dataset_kind: DatasetKind

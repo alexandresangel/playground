@@ -10,7 +10,6 @@ TARGET_AMOUNT_COLUMN = "TARGET_AMOUNT"
 KNOWN_AMOUNT_COLUMN = "KNOWN_AMOUNT"
 KNOWN_COUNT_COLUMN = "KNOWN_COUNT"
 OBSERVATION_COUNT_COLUMN = "OBSERVATION_COUNT"
-SEQUENCE_ID_COLUMN = "SEQUENCE_ID"
 DATE_COLUMN = "DATE"
 
 
@@ -83,20 +82,6 @@ def add_movement_scope(df: pd.DataFrame, ruleset: Ruleset) -> pd.DataFrame:
     return scoped
 
 
-def add_sequence_identifier(df: pd.DataFrame, ruleset: Ruleset) -> pd.DataFrame:
-    """Add a stable sequence identifier across outputs."""
-
-    identified = df.copy()
-    identified[SEQUENCE_ID_COLUMN] = (
-        identified[ruleset.entity_column].astype("string")
-        + "|"
-        + identified[ruleset.currency_column].astype("string")
-        + "|"
-        + identified[ruleset.movement_scope_column].astype("string")
-    )
-    return identified
-
-
 class GoldRealizedBuilder:
     """Build realized cash-in labels at the target grain."""
 
@@ -104,13 +89,13 @@ class GoldRealizedBuilder:
         self.ruleset = ruleset
 
     def build(self, filtered_table: pd.DataFrame) -> pd.DataFrame:
-        """Aggregate realized values by VALUE_DATE and sequence."""
+        """Aggregate realized values by VALUE_DATE."""
 
         if filtered_table.empty:
-            columns = self.ruleset.aggregation_dimensions + [
+            columns = [
+                self.ruleset.truth_date_column,
                 TARGET_AMOUNT_COLUMN,
                 OBSERVATION_COUNT_COLUMN,
-                SEQUENCE_ID_COLUMN,
             ]
             return pd.DataFrame(columns=columns)
 
@@ -121,7 +106,7 @@ class GoldRealizedBuilder:
         realized = realized.assign(_target_amount=target_amount)
         aggregated = (
             realized.groupby(
-                self.ruleset.aggregation_dimensions,
+                [self.ruleset.truth_date_column],
                 dropna=False,
                 observed=True,
             )
@@ -131,7 +116,7 @@ class GoldRealizedBuilder:
             )
             .reset_index()
         )
-        return add_sequence_identifier(aggregated, self.ruleset)
+        return aggregated
 
 
 class GoldFeatureSourceBuilder:
@@ -147,12 +132,8 @@ class GoldFeatureSourceBuilder:
             columns = [
                 self.ruleset.availability_date_column,
                 self.ruleset.truth_date_column,
-                self.ruleset.entity_column,
-                self.ruleset.currency_column,
-                self.ruleset.movement_scope_column,
                 KNOWN_AMOUNT_COLUMN,
                 KNOWN_COUNT_COLUMN,
-                SEQUENCE_ID_COLUMN,
             ]
             return pd.DataFrame(columns=columns)
 
@@ -166,9 +147,6 @@ class GoldFeatureSourceBuilder:
                 [
                     self.ruleset.availability_date_column,
                     self.ruleset.truth_date_column,
-                    self.ruleset.entity_column,
-                    self.ruleset.currency_column,
-                    self.ruleset.movement_scope_column,
                 ],
                 dropna=False,
                 observed=True,
@@ -179,64 +157,7 @@ class GoldFeatureSourceBuilder:
             )
             .reset_index()
         )
-        return add_sequence_identifier(aggregated, self.ruleset)
-
-
-class ReferenceBuilder:
-    """Build shared Gold reference tables."""
-
-    def __init__(self, ruleset: Ruleset):
-        self.ruleset = ruleset
-
-    def build_sequence_reference(
-        self,
-        realized_cash_in: pd.DataFrame,
-        known_movements_daily: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Build the distinct list of sequences used downstream."""
-
-        frames = [frame for frame in [realized_cash_in, known_movements_daily] if not frame.empty]
-        if not frames:
-            columns = self.ruleset.sequence_columns + [SEQUENCE_ID_COLUMN]
-            return pd.DataFrame(columns=columns)
-
-        combined = pd.concat(frames, ignore_index=True, sort=False)
-        return (
-            combined[self.ruleset.sequence_columns + [SEQUENCE_ID_COLUMN]]
-            .drop_duplicates()
-            .sort_values(self.ruleset.sequence_columns)
-            .reset_index(drop=True)
-        )
-
-    def build_calendar_daily(self, filtered_table: pd.DataFrame) -> pd.DataFrame:
-        """Build a dense daily calendar covering the Gold data horizon."""
-
-        if filtered_table.empty:
-            columns = [
-                DATE_COLUMN,
-                "DAY_OF_WEEK",
-                "DAY_OF_MONTH",
-                "IS_MONTH_END",
-                "IS_MONTH_START",
-                "IS_WEEKEND",
-            ]
-            return pd.DataFrame(columns=columns)
-
-        min_date = min(
-            filtered_table[self.ruleset.truth_date_column].min(),
-            filtered_table[self.ruleset.availability_date_column].min(),
-        )
-        max_date = max(
-            filtered_table[self.ruleset.truth_date_column].max(),
-            filtered_table[self.ruleset.availability_date_column].max(),
-        )
-        calendar = pd.DataFrame({DATE_COLUMN: pd.date_range(min_date, max_date, freq="D")})
-        calendar["DAY_OF_WEEK"] = calendar[DATE_COLUMN].dt.dayofweek
-        calendar["DAY_OF_MONTH"] = calendar[DATE_COLUMN].dt.day
-        calendar["IS_MONTH_END"] = calendar[DATE_COLUMN].dt.is_month_end
-        calendar["IS_MONTH_START"] = calendar[DATE_COLUMN].dt.is_month_start
-        calendar["IS_WEEKEND"] = calendar["DAY_OF_WEEK"] >= 5
-        return calendar
+        return aggregated
 
 
 class GoldBuilder:
@@ -246,7 +167,6 @@ class GoldBuilder:
         self.ruleset = ruleset
         self.realized_builder = GoldRealizedBuilder(ruleset)
         self.feature_builder = GoldFeatureSourceBuilder(ruleset)
-        self.reference_builder = ReferenceBuilder(ruleset)
 
     def build(self, request: GoldBuildRequest) -> GoldBuildResult:
         """Build Gold outputs from reusable Silver entity tables."""
@@ -255,43 +175,26 @@ class GoldBuilder:
         if silver_table.empty:
             realized_cash_in = self.realized_builder.build(silver_table)
             known_movements_daily = self.feature_builder.build(silver_table)
-            sequence_reference = self.reference_builder.build_sequence_reference(
-                realized_cash_in,
-                known_movements_daily,
-            )
-            calendar_daily = self.reference_builder.build_calendar_daily(silver_table)
         else:
             filtered = apply_ruleset_filters(silver_table, self.ruleset)
             filtered = add_movement_scope(filtered, self.ruleset)
-            filtered = add_sequence_identifier(filtered, self.ruleset)
             realized_cash_in = self.realized_builder.build(filtered)
             known_movements_daily = self.feature_builder.build(filtered)
-            sequence_reference = self.reference_builder.build_sequence_reference(
-                realized_cash_in,
-                known_movements_daily,
-            )
-            calendar_daily = self.reference_builder.build_calendar_daily(filtered)
 
         manifest = BuildManifest(
             layer="gold",
             row_count=(
                 len(realized_cash_in)
                 + len(known_movements_daily)
-                + len(sequence_reference)
-                + len(calendar_daily)
             ),
             table_names=[
                 "realized_cash_in",
                 "known_movements_daily",
-                "sequence_reference",
-                "calendar_daily",
             ],
             metadata={"ruleset_id": self.ruleset.ruleset_id},
         )
         return GoldBuildResult(
             realized_cash_in=realized_cash_in,
             known_movements_daily=known_movements_daily,
-            sequence_reference=sequence_reference,
-            calendar_daily=calendar_daily,
             manifest=manifest,
         )

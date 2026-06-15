@@ -1,7 +1,6 @@
 from __future__ import annotations
 import pandas as pd
 
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN
 from cash_flow_forecast.data_layers.gold.builder import TARGET_AMOUNT_COLUMN
 
 PREDICTION_COLUMN = "PREDICTION"
@@ -67,12 +66,12 @@ def mean_training_value(frame: pd.DataFrame) -> float:
 
 
 def nixtla_frame(frame: pd.DataFrame, unique_id: str | None = None) -> pd.DataFrame:
-    """Return a one-sequence frame using Nixtla's unique_id/ds/y schema."""
+    """Return a single-series frame using Nixtla's unique_id/ds/y schema."""
 
     if frame.empty:
         return pd.DataFrame(columns=["unique_id", "ds", "y"])
     ordered = frame.sort_values("FORECAST_DATE")
-    series_id = unique_id or _sequence_id(frame)
+    series_id = unique_id or DEFAULT_UNIQUE_ID
     result = pd.DataFrame(
         {
             "unique_id": series_id,
@@ -100,9 +99,3 @@ def forecast_column(frame: pd.DataFrame) -> str:
     if not candidates:
         raise ValueError("Forecast output does not contain a model prediction column.")
     return candidates[0]
-
-
-def _sequence_id(frame: pd.DataFrame) -> str:
-    if SEQUENCE_ID_COLUMN in frame.columns and not frame.empty:
-        return str(frame[SEQUENCE_ID_COLUMN].iloc[0])
-    return DEFAULT_UNIQUE_ID

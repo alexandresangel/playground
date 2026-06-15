@@ -7,13 +7,11 @@ import sys
 from typing import Any
 
 from loguru import logger
-import pandas as pd
 import yaml
 
 from cash_flow_forecast.adapters.base import ForecastingStorageAdapter
 from cash_flow_forecast.adapters.local.io import LocalForecastingStorageAdapter
 from cash_flow_forecast.adapters.local.rules import load_ruleset_from_yaml
-from cash_flow_forecast.contracts.rules import Ruleset
 from cash_flow_forecast.model_development.backtest_config import (
     BacktestDefinition,
     parse_backtest_definition,
@@ -86,28 +84,25 @@ def run_local_backtest_from_yaml(
     ruleset = load_ruleset_from_yaml(local_config.ruleset_path)
     gold_outputs = storage.read_gold_outputs(local_config.input_path)
     records = runner.run(local_config.definition, gold_outputs, ruleset)
-    write_local_backtest_records(local_config.output_path, records, ruleset, storage=storage)
+    write_local_backtest_records(local_config.output_path, records, storage=storage)
     return records
 
 
 def write_local_backtest_records(
     output_path: str | Path,
     records: list[BacktestRunRecord],
-    ruleset: Ruleset,
     *,
     storage: ForecastingStorageAdapter | None = None,
 ) -> None:
     """Persist in-memory backtest records to the local run folder layout."""
 
     storage = storage or LocalForecastingStorageAdapter()
+    output_root = Path(output_path)
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "backtest_runs_summary.csv").unlink(missing_ok=True)
     for record in records:
-        sequence_path = sequence_output_path(output_path, record.sequence_row, ruleset)
-        sequence_path.mkdir(parents=True, exist_ok=True)
-        (sequence_path / "backtest_runs_summary.csv").unlink(missing_ok=True)
         run_path = run_output_path(
             output_path,
-            record.sequence_row,
-            ruleset,
             model_name=record.model_spec.model_name,
             custom_name=record.model_config.custom_name,
         )
@@ -126,24 +121,14 @@ def configure_loguru(level: str = "INFO") -> None:
     )
 
 
-def sequence_output_path(output_root: str | Path, sequence_row: pd.Series, ruleset: Ruleset) -> Path:
-    """Return the local output folder for already-scoped single-series backtests."""
-
-    _ = (sequence_row, ruleset)
-    return Path(output_root)
-
-
 def run_output_path(
     output_root: str | Path,
-    sequence_row: pd.Series,
-    ruleset: Ruleset,
     *,
     model_name: str,
     custom_name: str,
 ) -> Path:
     """Return the local output folder for one model/custom-name run."""
 
-    _ = (sequence_row, ruleset)
     return Path(output_root) / _model_custom_leaf(
         model_name,
         custom_name,

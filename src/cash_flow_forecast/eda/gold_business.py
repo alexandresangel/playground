@@ -11,7 +11,6 @@ from cash_flow_forecast.contracts.rules import Ruleset
 from cash_flow_forecast.data_layers.gold.builder import (
     KNOWN_AMOUNT_COLUMN,
     KNOWN_COUNT_COLUMN,
-    SEQUENCE_ID_COLUMN,
     TARGET_AMOUNT_COLUMN,
     apply_column_rule,
     apply_ruleset_filters,
@@ -33,10 +32,8 @@ RULE_STEP_COL = "RULE_STEP"
 REMOVED_SUFFIX = "_REMOVED"
 
 GOLD_TABLE_FILES = {
-    "calendar_daily": "calendar_daily.parquet",
     "known_movements_daily": "known_movements_daily.parquet",
     "realized_cash_in": "realized_cash_in.parquet",
-    "sequence_reference": "sequence_reference.parquet",
 }
 
 TABLE_CONTRACTS = {
@@ -54,7 +51,7 @@ TABLE_CONTRACTS = {
 }
 
 
-DAILY_SEQUENCE_KEY = [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN]
+DAILY_GOLD_KEY = [VALUE_DATE_COL]
 
 LAG_BUCKET_ORDER = [
     "5+ days before value",
@@ -124,7 +121,7 @@ def normalize_table(df: pd.DataFrame) -> pd.DataFrame:
         if column in out.columns:
             out[column] = pd.to_numeric(out[column], errors="coerce")
 
-    for column in [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, MOVEMENT_TYPE_COL, SEQUENCE_ID_COLUMN]:
+    for column in [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, MOVEMENT_TYPE_COL]:
         if column in out.columns:
             out[column] = out[column].astype("string")
 
@@ -132,10 +129,9 @@ def normalize_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def clean_gold_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """Drop synthetic zero-count Gold rows and stale zero-only sequence references."""
+    """Drop synthetic zero-count Gold rows."""
 
     cleaned = {name: frame.copy() for name, frame in tables.items()}
-    observed_sequence_ids: set[str] = set()
 
     for table_name, count_col in [
         ("realized_cash_in", OBSERVATION_COUNT_COLUMN),
@@ -146,14 +142,6 @@ def clean_gold_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame
             continue
         frame = frame.loc[frame[count_col].fillna(0) > 0].reset_index(drop=True)
         cleaned[table_name] = frame
-        if SEQUENCE_ID_COLUMN in frame.columns:
-            observed_sequence_ids.update(frame[SEQUENCE_ID_COLUMN].dropna().astype(str))
-
-    sequence_reference = cleaned.get("sequence_reference")
-    if sequence_reference is not None and observed_sequence_ids and SEQUENCE_ID_COLUMN in sequence_reference.columns:
-        cleaned["sequence_reference"] = sequence_reference.loc[
-            sequence_reference[SEQUENCE_ID_COLUMN].astype(str).isin(observed_sequence_ids)
-        ].reset_index(drop=True)
 
     return cleaned
 
@@ -188,19 +176,19 @@ def discover_dimensions(
     gold_tables: dict[str, pd.DataFrame],
     silver_tables: dict[str, pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
-    """Return discovered entities, currencies, movements, sequences, and date ranges."""
+    """Return discovered dimensions and Gold date ranges."""
 
     silver_tables = silver_tables or {}
     frames = [
         frame
-        for name in ["sequence_reference", "realized_cash_in", "known_movements_daily"]
+        for name in ["realized_cash_in", "known_movements_daily"]
         if not (frame := gold_tables.get(name, pd.DataFrame())).empty
     ]
     gold_dim = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
 
     rows = []
     if not gold_dim.empty:
-        grouped_cols = [col for col in [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN] if col in gold_dim.columns]
+        grouped_cols = [col for col in [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL] if col in gold_dim.columns]
         if grouped_cols:
             base = gold_dim[grouped_cols].drop_duplicates()
             for _, row in base.iterrows():
@@ -209,7 +197,6 @@ def discover_dimensions(
                         ENTITY_COL: row.get(ENTITY_COL, pd.NA),
                         CURRENCY_COL: row.get(CURRENCY_COL, pd.NA),
                         MOVEMENT_COL: row.get(MOVEMENT_COL, pd.NA),
-                        SEQUENCE_ID_COLUMN: row.get(SEQUENCE_ID_COLUMN, pd.NA),
                         "SOURCE": "gold",
                     }
                 )
@@ -239,9 +226,6 @@ def gold_date_range(tables: dict[str, pd.DataFrame]) -> tuple[pd.Timestamp | pd.
         date_col = contract["date_col"]
         if not frame.empty and date_col in frame.columns:
             dates.append(pd.to_datetime(frame[date_col], errors="coerce"))
-    calendar = tables.get("calendar_daily", pd.DataFrame())
-    if not calendar.empty and DATE_COL in calendar.columns:
-        dates.append(pd.to_datetime(calendar[DATE_COL], errors="coerce"))
     if not dates:
         return pd.NaT, pd.NaT
     combined = pd.concat(dates).dropna()
@@ -356,7 +340,7 @@ def availability_summary(
         return pd.DataFrame()
 
     group_cols = [column for column in group_cols if column in realized_cash_in.columns]
-    key_cols = group_cols + [SEQUENCE_ID_COLUMN, VALUE_DATE_COL]
+    key_cols = group_cols + [VALUE_DATE_COL]
     realized = realized_cash_in.copy()
     realized["CUTOFF_DATE"] = pd.to_datetime(realized[VALUE_DATE_COL]) - pd.Timedelta(days=1)
 
@@ -429,24 +413,41 @@ def availability_summary(
     daily["ABS_KNOWN_AT_CUTOFF_AMOUNT"] = daily["KNOWN_AT_CUTOFF_AMOUNT"].abs()
     daily["ABS_LATE_AFTER_CUTOFF_AMOUNT"] = daily["LATE_AFTER_CUTOFF_AMOUNT"].abs()
 
-    summary = (
-        daily.groupby(group_cols, dropna=False, observed=True)
-        .agg(
-            DAYS=(VALUE_DATE_COL, "nunique"),
-            TARGET_AMOUNT=(TARGET_AMOUNT_COLUMN, "sum"),
-            ABS_TARGET_AMOUNT=("ABS_TARGET_AMOUNT", "sum"),
-            KNOWN_AT_CUTOFF_AMOUNT=("KNOWN_AT_CUTOFF_AMOUNT", "sum"),
-            ABS_KNOWN_AT_CUTOFF_AMOUNT=("ABS_KNOWN_AT_CUTOFF_AMOUNT", "sum"),
-            LATE_AFTER_CUTOFF_AMOUNT=("LATE_AFTER_CUTOFF_AMOUNT", "sum"),
-            ABS_LATE_AFTER_CUTOFF_AMOUNT=("ABS_LATE_AFTER_CUTOFF_AMOUNT", "sum"),
-            KNOWN_AT_CUTOFF_COUNT=("KNOWN_AT_CUTOFF_COUNT", "sum"),
-            LATE_AFTER_CUTOFF_COUNT=("LATE_AFTER_CUTOFF_COUNT", "sum"),
-            SAME_DAY_AMOUNT=("SAME_DAY_AMOUNT", "sum"),
-            ADVANCE_KNOWN_AMOUNT=("ADVANCE_KNOWN_AMOUNT", "sum"),
-            AFTER_VALUE_AMOUNT=("AFTER_VALUE_AMOUNT", "sum"),
-        )
-        .reset_index()
+    aggregations = dict(
+        DAYS=(VALUE_DATE_COL, "nunique"),
+        TARGET_AMOUNT=(TARGET_AMOUNT_COLUMN, "sum"),
+        ABS_TARGET_AMOUNT=("ABS_TARGET_AMOUNT", "sum"),
+        KNOWN_AT_CUTOFF_AMOUNT=("KNOWN_AT_CUTOFF_AMOUNT", "sum"),
+        ABS_KNOWN_AT_CUTOFF_AMOUNT=("ABS_KNOWN_AT_CUTOFF_AMOUNT", "sum"),
+        LATE_AFTER_CUTOFF_AMOUNT=("LATE_AFTER_CUTOFF_AMOUNT", "sum"),
+        ABS_LATE_AFTER_CUTOFF_AMOUNT=("ABS_LATE_AFTER_CUTOFF_AMOUNT", "sum"),
+        KNOWN_AT_CUTOFF_COUNT=("KNOWN_AT_CUTOFF_COUNT", "sum"),
+        LATE_AFTER_CUTOFF_COUNT=("LATE_AFTER_CUTOFF_COUNT", "sum"),
+        SAME_DAY_AMOUNT=("SAME_DAY_AMOUNT", "sum"),
+        ADVANCE_KNOWN_AMOUNT=("ADVANCE_KNOWN_AMOUNT", "sum"),
+        AFTER_VALUE_AMOUNT=("AFTER_VALUE_AMOUNT", "sum"),
     )
+    if group_cols:
+        summary = daily.groupby(group_cols, dropna=False, observed=True).agg(**aggregations).reset_index()
+    else:
+        summary = pd.DataFrame(
+            [
+                {
+                    "DAYS": daily[VALUE_DATE_COL].nunique(),
+                    "TARGET_AMOUNT": daily[TARGET_AMOUNT_COLUMN].sum(),
+                    "ABS_TARGET_AMOUNT": daily["ABS_TARGET_AMOUNT"].sum(),
+                    "KNOWN_AT_CUTOFF_AMOUNT": daily["KNOWN_AT_CUTOFF_AMOUNT"].sum(),
+                    "ABS_KNOWN_AT_CUTOFF_AMOUNT": daily["ABS_KNOWN_AT_CUTOFF_AMOUNT"].sum(),
+                    "LATE_AFTER_CUTOFF_AMOUNT": daily["LATE_AFTER_CUTOFF_AMOUNT"].sum(),
+                    "ABS_LATE_AFTER_CUTOFF_AMOUNT": daily["ABS_LATE_AFTER_CUTOFF_AMOUNT"].sum(),
+                    "KNOWN_AT_CUTOFF_COUNT": daily["KNOWN_AT_CUTOFF_COUNT"].sum(),
+                    "LATE_AFTER_CUTOFF_COUNT": daily["LATE_AFTER_CUTOFF_COUNT"].sum(),
+                    "SAME_DAY_AMOUNT": daily["SAME_DAY_AMOUNT"].sum(),
+                    "ADVANCE_KNOWN_AMOUNT": daily["ADVANCE_KNOWN_AMOUNT"].sum(),
+                    "AFTER_VALUE_AMOUNT": daily["AFTER_VALUE_AMOUNT"].sum(),
+                }
+            ]
+        )
     summary["KNOWN_COVERAGE_RATIO_ABS"] = _safe_divide(
         summary["ABS_KNOWN_AT_CUTOFF_AMOUNT"],
         summary["ABS_TARGET_AMOUNT"],
@@ -516,73 +517,51 @@ def concentration_summary(
 
 def forecastability_diagnostics(
     realized_cash_in: pd.DataFrame,
-    calendar_daily: pd.DataFrame,
-    sequence_reference: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Compute sequence-level history, intermittency, and spike diagnostics."""
+    """Compute date-level history, intermittency, and spike diagnostics."""
 
-    if sequence_reference.empty or calendar_daily.empty:
+    if realized_cash_in.empty or VALUE_DATE_COL not in realized_cash_in.columns:
+        return pd.DataFrame()
+    if TARGET_AMOUNT_COLUMN not in realized_cash_in.columns:
         return pd.DataFrame()
 
-    sequences = sequence_reference.copy()
-    if SEQUENCE_ID_COLUMN in realized_cash_in.columns and OBSERVATION_COUNT_COLUMN in realized_cash_in.columns:
-        observed_sequence_ids = realized_cash_in.loc[
-            realized_cash_in[OBSERVATION_COUNT_COLUMN].fillna(0) > 0,
-            SEQUENCE_ID_COLUMN,
-        ].dropna().astype(str)
-        if not observed_sequence_ids.empty:
-            sequences = sequences.loc[sequences[SEQUENCE_ID_COLUMN].astype(str).isin(set(observed_sequence_ids))]
-
-    if sequences.empty:
-        return pd.DataFrame()
-
-    calendar = calendar_daily[[DATE_COL]].dropna().copy()
-    calendar["_merge_key"] = 1
-    sequences = sequences.copy()
-    sequences["_merge_key"] = 1
-    panel = sequences.merge(calendar, on="_merge_key").drop(columns="_merge_key")
     realized = realized_cash_in.copy()
-    panel = panel.merge(
-        realized[
-            [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN, VALUE_DATE_COL, TARGET_AMOUNT_COLUMN]
-        ],
-        left_on=[ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN, DATE_COL],
-        right_on=[ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN, VALUE_DATE_COL],
-        how="left",
+    realized[VALUE_DATE_COL] = pd.to_datetime(realized[VALUE_DATE_COL], errors="coerce").dt.normalize()
+    daily = (
+        realized.dropna(subset=[VALUE_DATE_COL])
+        .groupby(VALUE_DATE_COL, dropna=False, observed=True)[TARGET_AMOUNT_COLUMN]
+        .sum()
+        .reset_index()
     )
+    if daily.empty:
+        return pd.DataFrame()
+    calendar = pd.DataFrame({VALUE_DATE_COL: pd.date_range(daily[VALUE_DATE_COL].min(), daily[VALUE_DATE_COL].max())})
+    panel = calendar.merge(daily, on=VALUE_DATE_COL, how="left")
     panel[TARGET_AMOUNT_COLUMN] = panel[TARGET_AMOUNT_COLUMN].fillna(0.0)
     panel["IS_ACTIVE_DAY"] = panel[TARGET_AMOUNT_COLUMN] != 0
     panel["ABS_TARGET_AMOUNT"] = panel[TARGET_AMOUNT_COLUMN].abs()
-
-    rows = []
-    for keys, frame in panel.groupby([ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN], dropna=False, observed=True):
-        ordered = frame.sort_values(DATE_COL)
-        active = ordered.loc[ordered["IS_ACTIVE_DAY"]]
-        active_ratio = float(ordered["IS_ACTIVE_DAY"].mean()) if len(ordered) else 0.0
-        non_zero_abs = active["ABS_TARGET_AMOUNT"]
-        p99 = float(non_zero_abs.quantile(0.99)) if not non_zero_abs.empty else 0.0
-        rows.append(
+    active = panel.loc[panel["IS_ACTIVE_DAY"]]
+    active_ratio = float(panel["IS_ACTIVE_DAY"].mean()) if len(panel) else 0.0
+    non_zero_abs = active["ABS_TARGET_AMOUNT"]
+    return pd.DataFrame(
+        [
             {
-                ENTITY_COL: keys[0],
-                CURRENCY_COL: keys[1],
-                MOVEMENT_COL: keys[2],
-                SEQUENCE_ID_COLUMN: keys[3],
-                "DAYS": len(ordered),
+                "DAYS": len(panel),
                 "ACTIVE_DAYS": len(active),
                 "ACTIVE_DAY_RATIO": active_ratio,
-                "ZERO_DAYS": int((~ordered["IS_ACTIVE_DAY"]).sum()),
-                "MAX_ZERO_RUN_DAYS": max_zero_run(ordered["IS_ACTIVE_DAY"]),
-                "FIRST_ACTIVE_DATE": active[DATE_COL].min() if not active.empty else pd.NaT,
-                "LAST_ACTIVE_DATE": active[DATE_COL].max() if not active.empty else pd.NaT,
-                "TOTAL_AMOUNT": float(ordered[TARGET_AMOUNT_COLUMN].sum()),
-                "ABS_TOTAL_AMOUNT": float(ordered["ABS_TARGET_AMOUNT"].sum()),
+                "ZERO_DAYS": int((~panel["IS_ACTIVE_DAY"]).sum()),
+                "MAX_ZERO_RUN_DAYS": max_zero_run(panel["IS_ACTIVE_DAY"]),
+                "FIRST_ACTIVE_DATE": active[VALUE_DATE_COL].min() if not active.empty else pd.NaT,
+                "LAST_ACTIVE_DATE": active[VALUE_DATE_COL].max() if not active.empty else pd.NaT,
+                "TOTAL_AMOUNT": float(panel[TARGET_AMOUNT_COLUMN].sum()),
+                "ABS_TOTAL_AMOUNT": float(panel["ABS_TARGET_AMOUNT"].sum()),
                 "AVG_ACTIVE_ABS_AMOUNT": float(non_zero_abs.mean()) if not non_zero_abs.empty else 0.0,
-                "STD_DAILY_AMOUNT": float(ordered[TARGET_AMOUNT_COLUMN].std(ddof=0)) if len(ordered) else 0.0,
-                "P99_ACTIVE_ABS_AMOUNT": p99,
+                "STD_DAILY_AMOUNT": float(panel[TARGET_AMOUNT_COLUMN].std(ddof=0)) if len(panel) else 0.0,
+                "P99_ACTIVE_ABS_AMOUNT": float(non_zero_abs.quantile(0.99)) if not non_zero_abs.empty else 0.0,
                 "INTERMITTENCY_CLASS": intermittency_class(active_ratio),
             }
-        )
-    return pd.DataFrame(rows).sort_values("ABS_TOTAL_AMOUNT", ascending=False).reset_index(drop=True)
+        ]
+    )
 
 
 def max_zero_run(active_mask: pd.Series) -> int:
@@ -747,20 +726,12 @@ def window_bounds(
 def complete_daily_panel(
     df: pd.DataFrame,
     table_name: str,
-    calendar_daily: pd.DataFrame,
-    sequence_reference: pd.DataFrame | None = None,
     *,
     entity: str | None = None,
     start_date: pd.Timestamp | str | None = None,
     end_date: pd.Timestamp | str | None = None,
 ) -> pd.DataFrame:
-    """Return a zero-filled daily panel at sequence grain using calendar_daily.
-
-    Missing rows are interpreted as zero amount and zero count for the sequence
-    defined by entity, currency, movement scope, and sequence id. For
-    known_movements_daily this creates a Value Date panel for plotting and daily
-    coverage summaries; Trade Date analyses should continue to use observed rows.
-    """
+    """Return a zero-filled date-level Gold panel."""
 
     contract = TABLE_CONTRACTS.get(table_name)
     if not contract:
@@ -768,24 +739,22 @@ def complete_daily_panel(
     date_col = contract["date_col"]
     amount_col = contract["amount_col"]
     count_col = contract["count_col"]
-    if calendar_daily.empty or DATE_COL not in calendar_daily.columns:
-        return filter_by_window(filter_by_entity(df, entity), date_col, pd.Timestamp(start_date) if start_date is not None else None, pd.Timestamp(end_date) if end_date is not None else None)
+    observed = filter_by_entity(df, entity)
+    observed[date_col] = pd.to_datetime(observed[date_col], errors="coerce").dt.normalize() if date_col in observed.columns else pd.NaT
+    observed = filter_by_window(
+        observed,
+        date_col,
+        pd.Timestamp(start_date) if start_date is not None else None,
+        pd.Timestamp(end_date) if end_date is not None else None,
+    )
+    if observed.empty or date_col not in observed.columns:
+        return observed
 
-    sequence_source = sequence_reference if sequence_reference is not None and not sequence_reference.empty else df
-    if sequence_source is None or sequence_source.empty:
-        return filter_by_window(filter_by_entity(df, entity), date_col, pd.Timestamp(start_date) if start_date is not None else None, pd.Timestamp(end_date) if end_date is not None else None)
-
-    required_sequence_cols = [column for column in DAILY_SEQUENCE_KEY if column in sequence_source.columns]
-    if len(required_sequence_cols) < len(DAILY_SEQUENCE_KEY):
-        return filter_by_window(filter_by_entity(df, entity), date_col, pd.Timestamp(start_date) if start_date is not None else None, pd.Timestamp(end_date) if end_date is not None else None)
-
-    sequences = sequence_source[DAILY_SEQUENCE_KEY].drop_duplicates().copy()
-    sequences = filter_by_entity(sequences, entity)
-    if sequences.empty:
-        return pd.DataFrame(columns=DAILY_SEQUENCE_KEY + [date_col, amount_col, count_col])
-
-    calendar = calendar_daily[[DATE_COL]].dropna().drop_duplicates().rename(columns={DATE_COL: date_col})
-    calendar[date_col] = pd.to_datetime(calendar[date_col], errors="coerce").dt.normalize()
+    min_date = pd.Timestamp(start_date).normalize() if start_date is not None else observed[date_col].min()
+    max_date = pd.Timestamp(end_date).normalize() if end_date is not None else observed[date_col].max()
+    if pd.isna(min_date) or pd.isna(max_date):
+        return pd.DataFrame(columns=[date_col, amount_col, count_col])
+    calendar = pd.DataFrame({date_col: pd.date_range(min_date, max_date, freq="D")})
     calendar = filter_by_window(
         calendar,
         date_col,
@@ -793,19 +762,9 @@ def complete_daily_panel(
         pd.Timestamp(end_date) if end_date is not None else None,
     )
     if calendar.empty:
-        return pd.DataFrame(columns=DAILY_SEQUENCE_KEY + [date_col, amount_col, count_col])
+        return pd.DataFrame(columns=[date_col, amount_col, count_col])
 
-    grid = sequences.merge(calendar, how="cross")
-    observed = df.copy()
-    observed = filter_by_entity(observed, entity)
-    observed = filter_by_window(
-        observed,
-        date_col,
-        pd.Timestamp(start_date) if start_date is not None else None,
-        pd.Timestamp(end_date) if end_date is not None else None,
-    )
-
-    merge_cols = DAILY_SEQUENCE_KEY + [date_col]
+    merge_cols = [date_col]
     value_cols = [amount_col, count_col]
     if observed.empty or any(column not in observed.columns for column in merge_cols + value_cols):
         aggregated = pd.DataFrame(columns=merge_cols + value_cols)
@@ -823,7 +782,7 @@ def complete_daily_panel(
             .reset_index()
         )
 
-    panel = grid.merge(aggregated, on=merge_cols, how="left")
+    panel = calendar.merge(aggregated, on=merge_cols, how="left")
     panel[amount_col] = panel[amount_col].fillna(0.0)
     panel[count_col] = panel[count_col].fillna(0.0)
     return panel.sort_values(merge_cols).reset_index(drop=True)
@@ -838,14 +797,10 @@ def complete_gold_panels(
 ) -> dict[str, pd.DataFrame]:
     """Create zero-filled daily panels for plottable Gold tables."""
 
-    calendar = gold_tables.get("calendar_daily", pd.DataFrame())
-    sequence_reference = filter_by_entity(gold_tables.get("sequence_reference", pd.DataFrame()), entity)
     return {
         "realized_cash_in": complete_daily_panel(
             gold_tables.get("realized_cash_in", pd.DataFrame()),
             "realized_cash_in",
-            calendar,
-            sequence_reference,
             entity=entity,
             start_date=start_date,
             end_date=end_date,
@@ -853,8 +808,6 @@ def complete_gold_panels(
         "known_movements_daily": complete_daily_panel(
             gold_tables.get("known_movements_daily", pd.DataFrame()),
             "known_movements_daily",
-            calendar,
-            sequence_reference,
             entity=entity,
             start_date=start_date,
             end_date=end_date,
@@ -878,13 +831,6 @@ def observed_gold_tables_for_entity(
             filtered = filter_by_window(
                 filtered,
                 TABLE_CONTRACTS[table_name]["date_col"],
-                pd.Timestamp(start_date) if start_date is not None else None,
-                pd.Timestamp(end_date) if end_date is not None else None,
-            )
-        elif table_name == "calendar_daily":
-            filtered = filter_by_window(
-                filtered,
-                DATE_COL,
                 pd.Timestamp(start_date) if start_date is not None else None,
                 pd.Timestamp(end_date) if end_date is not None else None,
             )
@@ -1167,7 +1113,7 @@ def plot_known_vs_realized_coverage(
 
     if realized_cash_in.empty:
         return None
-    keys = [ENTITY_COL, CURRENCY_COL, MOVEMENT_COL, SEQUENCE_ID_COLUMN, VALUE_DATE_COL]
+    keys = [VALUE_DATE_COL]
     realized = realized_cash_in.copy()
     realized["CUTOFF_DATE"] = realized[VALUE_DATE_COL] - pd.Timedelta(days=1)
     known = known_movements_daily.copy()

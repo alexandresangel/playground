@@ -4,7 +4,6 @@ from cash_flow_forecast.adapters.local.backtests import (
     load_local_backtest_yaml,
     run_local_backtest_from_yaml,
     run_output_path,
-    sequence_output_path,
     write_local_backtest_records,
 )
 from cash_flow_forecast.adapters.local.io import (
@@ -31,7 +30,6 @@ __all__ = [
     "read_silver_tables",
     "run_local_backtest_from_yaml",
     "run_output_path",
-    "sequence_output_path",
     "write_backtest_result",
     "write_dataset_result",
     "write_forecast_result",

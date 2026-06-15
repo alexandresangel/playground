@@ -4,10 +4,10 @@ from cash_flow_forecast.modeling.sktime import SktimeForecasterAdapter
 
 
 class AutoArimaModel(SktimeForecasterAdapter):
-    """sktime AutoARIMA for one selected D+1 sequence."""
+    """sktime AutoARIMA for one D+1 Gold series."""
 
     model_name = "auto_arima"
-    description = "sktime AutoARIMA fitted on one selected sequence."
+    description = "sktime AutoARIMA fitted on one Gold series."
     default_parameters = {
         "sp": 7,
         "seasonal": True,
@@ -26,7 +26,7 @@ class SarimaModel(SktimeForecasterAdapter):
     """sktime SARIMAX wrapper for explicit SARIMA orders."""
 
     model_name = "sarima"
-    description = "sktime SARIMAX fitted on one selected sequence."
+    description = "sktime SARIMAX fitted on one Gold series."
     default_parameters = {
         "order": (1, 0, 0),
         "seasonal_order": (0, 0, 0, 0),
@@ -42,10 +42,10 @@ class SarimaModel(SktimeForecasterAdapter):
 
 
 class ThetaModel(SktimeForecasterAdapter):
-    """sktime Theta forecaster for one selected D+1 sequence."""
+    """sktime Theta forecaster for one D+1 Gold series."""
 
     model_name = "theta"
-    description = "sktime Theta forecaster fitted on one selected sequence."
+    description = "sktime Theta forecaster fitted on one Gold series."
     default_parameters = {"sp": 7}
 
     def _make_forecaster(self) -> object:
@@ -55,10 +55,10 @@ class ThetaModel(SktimeForecasterAdapter):
 
 
 class TbatsModel(SktimeForecasterAdapter):
-    """sktime TBATS forecaster for one selected D+1 sequence."""
+    """sktime TBATS forecaster for one D+1 Gold series."""
 
     model_name = "tbats"
-    description = "sktime TBATS fitted on one selected sequence."
+    description = "sktime TBATS fitted on one Gold series."
     default_parameters = {
         "sp": 7,
         "use_box_cox": False,
@@ -73,10 +73,10 @@ class TbatsModel(SktimeForecasterAdapter):
 
 
 class ProphetModel(SktimeForecasterAdapter):
-    """sktime Prophet wrapper for one selected D+1 sequence."""
+    """sktime Prophet wrapper for one D+1 Gold series."""
 
     model_name = "prophet"
-    description = "sktime Prophet fitted on one selected sequence."
+    description = "sktime Prophet fitted on one Gold series."
     default_parameters = {
         "freq": "D",
         "weekly_seasonality": True,
@@ -91,10 +91,10 @@ class ProphetModel(SktimeForecasterAdapter):
 
 
 class ProphetverseModel(SktimeForecasterAdapter):
-    """sktime Prophetverse wrapper for one selected D+1 sequence."""
+    """sktime Prophetverse wrapper for one D+1 Gold series."""
 
     model_name = "prophetverse"
-    description = "sktime Prophetverse fitted on one selected sequence."
+    description = "sktime Prophetverse fitted on one Gold series."
     default_parameters = {
         "trend": "linear",
         "likelihood": "normal",

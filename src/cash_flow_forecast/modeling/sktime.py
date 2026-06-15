@@ -19,7 +19,7 @@ from cash_flow_forecast.modeling.prediction_intervals import interval_lower_colu
 
 
 class SktimeForecasterAdapter(ForecastModel):
-    """Base adapter for one-sequence sktime forecasters."""
+    """Base adapter for single-series sktime forecasters."""
 
     dataset_kind = DatasetKind.TIME_SERIES
     model_name: str
@@ -171,7 +171,7 @@ class SktimeForecasterAdapter(ForecastModel):
         """Build the concrete sktime forecaster."""
 
     def _configure_forecaster(self) -> None:
-        """Read sktime tags needed by the generic one-sequence adapter."""
+        """Read sktime tags needed by the generic single-series adapter."""
 
         if self.forecaster_ is None:
             return

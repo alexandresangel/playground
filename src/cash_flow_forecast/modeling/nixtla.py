@@ -16,7 +16,7 @@ from cash_flow_forecast.modeling.features import (
 
 
 class StatsForecastAdapter(ForecastModel):
-    """Base adapter for one-sequence StatsForecast models."""
+    """Base adapter for single-series StatsForecast models."""
 
     dataset_kind = DatasetKind.TIME_SERIES
     model_name: str

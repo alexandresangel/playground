@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import pandas as pd
 
 from cash_flow_forecast.contracts.builders import BacktestConfig, BacktestResult, GoldBuildResult, ModelSpec
 from cash_flow_forecast.contracts.rules import Ruleset
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN
 from cash_flow_forecast.model_development.backtest_config import (
     BacktestDefinition,
     BacktestModelConfig,
-    resolve_single_sequence_row,
     to_backtest_config,
 )
 from cash_flow_forecast.model_development.backtesting import RollingWindowBacktestEngine
@@ -23,8 +20,6 @@ class BacktestRunRecord:
     model_spec: ModelSpec
     config: BacktestConfig
     result: BacktestResult
-    sequence_id: str
-    sequence_row: pd.Series
 
 
 class BacktestBatchRunner:
@@ -39,8 +34,6 @@ class BacktestBatchRunner:
         gold_outputs: GoldBuildResult,
         ruleset: Ruleset,
     ) -> list[BacktestRunRecord]:
-        sequence_row = resolve_single_sequence_row(gold_outputs, ruleset, definition.sequence)
-        sequence_id = str(sequence_row[SEQUENCE_ID_COLUMN])
         records: list[BacktestRunRecord] = []
 
         for model_config, model_spec in zip(definition.models, definition.model_specs, strict=True):
@@ -50,7 +43,6 @@ class BacktestBatchRunner:
                 ruleset=ruleset,
                 model=model_spec,
                 config=backtest_config,
-                sequence_id=sequence_id,
                 log_every_n_cutoffs=definition.evaluation.log_every_n_cutoffs,
             )
             records.append(
@@ -59,8 +51,6 @@ class BacktestBatchRunner:
                     model_spec=model_spec,
                     config=backtest_config,
                     result=result,
-                    sequence_id=sequence_id,
-                    sequence_row=sequence_row,
                 )
             )
 

@@ -28,7 +28,7 @@ from cash_flow_forecast.dataset_building.target_transforms import (
     inverse_transform_target_series,
     requires_fitted_target_transformer,
 )
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN, TARGET_AMOUNT_COLUMN
+from cash_flow_forecast.data_layers.gold.builder import TARGET_AMOUNT_COLUMN
 from cash_flow_forecast.modeling import ForecastModel, PREDICTION_COLUMN
 from cash_flow_forecast.modeling.composites import CompositeForecastModel
 from cash_flow_forecast.modeling.prediction_intervals import interval_columns
@@ -39,7 +39,7 @@ ModelSource = ForecastModel | Callable[[], ForecastModel] | ModelSpec | str
 
 
 class RollingWindowBacktestEngine:
-    """Run D+1 rolling-origin backtests for exactly one sequence."""
+    """Run D+1 rolling-origin backtests from one Gold dataset."""
 
     def __init__(self, dataset_builder: DatasetBuilder | None = None):
         self.dataset_builder = dataset_builder or DatasetBuilder()
@@ -50,11 +50,10 @@ class RollingWindowBacktestEngine:
         ruleset: Ruleset,
         model: ModelSource,
         config: BacktestConfig,
-        sequence_id: str,
         *,
         log_every_n_cutoffs: int = 1,
     ) -> BacktestResult:
-        """Run one rolling-origin backtest for one sequence."""
+        """Run one rolling-origin backtest."""
 
         model_factory, model_info, result_config = self._prepare_model(model, config)
         coverages = result_config.prediction_intervals_coverage
@@ -66,7 +65,6 @@ class RollingWindowBacktestEngine:
         total_training_rows = 0
         total_inference_rows = 0
         completed_folds = 0
-        sequence_identity = self._sequence_identity_from_gold(gold_outputs, ruleset, sequence_id)
         evaluation_cutoffs = pd.date_range(
             result_config.evaluation_cutoff_start,
             result_config.evaluation_cutoff_end,
@@ -74,11 +72,10 @@ class RollingWindowBacktestEngine:
         )
 
         logger.info(
-            "Starting D+1 backtest | model={} | dataset_kind={} | sequence_id={} | "
+            "Starting D+1 backtest | model={} | dataset_kind={} | "
             "cutoffs={} -> {} | train_window_days={} | history_window_days={}",
             model_info.model_name,
             result_config.dataset.kind.value,
-            sequence_id,
             result_config.evaluation_cutoff_start,
             result_config.evaluation_cutoff_end,
             result_config.train_window_days,
@@ -128,7 +125,6 @@ class RollingWindowBacktestEngine:
                     ruleset=ruleset,
                     cutoff=cutoff,
                     training_cutoffs=training_cutoffs,
-                    sequence_id=sequence_id,
                 )
                 feature_columns.update(fold_features)
                 training_frame = composite_training_frames.get(fold_model.anchor_alias, pd.DataFrame())
@@ -148,7 +144,6 @@ class RollingWindowBacktestEngine:
                     ruleset=ruleset,
                     dataset=result_config.dataset,
                     training_cutoffs=training_cutoffs,
-                    sequence_id=sequence_id,
                     label_as_of_date=cutoff.date(),
                 )
                 training_dataset = self.dataset_builder.build(
@@ -157,7 +152,6 @@ class RollingWindowBacktestEngine:
                         ruleset=ruleset,
                         dataset=result_config.dataset,
                         cutoff_dates=[cutoff_date.date() for cutoff_date in training_cutoffs],
-                        sequence_id=sequence_id,
                         label_as_of_date=cutoff.date(),
                         target_transformer=fold_target_transformer,
                     )
@@ -168,7 +162,6 @@ class RollingWindowBacktestEngine:
                         ruleset=ruleset,
                         dataset=result_config.dataset,
                         cutoff_dates=[cutoff.date()],
-                        sequence_id=sequence_id,
                         label_as_of_date=None,
                         target_transformer=fold_target_transformer,
                     )
@@ -197,14 +190,6 @@ class RollingWindowBacktestEngine:
                         len(inference_frame),
                     )
                 continue
-
-            self._validate_one_sequence(training_frame, sequence_id, "training")
-            self._validate_one_sequence(inference_frame, sequence_id, "inference")
-            if isinstance(fold_model, CompositeForecastModel):
-                for alias, frame in composite_training_frames.items():
-                    self._validate_one_sequence(frame, sequence_id, f"{alias} training")
-                for alias, frame in composite_inference_frames.items():
-                    self._validate_one_sequence(frame, sequence_id, f"{alias} inference")
 
             if isinstance(fold_model, CompositeForecastModel):
                 if coverages:
@@ -256,15 +241,12 @@ class RollingWindowBacktestEngine:
         if skipped_empty:
             logger.warning("Skipped {} fold(s): {}", skipped_empty, dict(skipped_reasons))
         logger.info(
-            "Finished backtest | model={} | custom_name={} | sequence_id={} | prediction_rows={}",
+            "Finished backtest | model={} | custom_name={} | prediction_rows={}",
             model_info.model_name,
             result_config.custom_name,
-            sequence_id,
             len(combined_predictions),
         )
         run_report = BacktestRunReport(
-            sequence_id=sequence_id,
-            sequence_identity=sequence_identity,
             model_info=model_info,
             custom_name=result_config.custom_name,
             dataset_kind=model_info.dataset_kind,
@@ -356,7 +338,6 @@ class RollingWindowBacktestEngine:
         ruleset: Ruleset,
         cutoff: pd.Timestamp,
         training_cutoffs: pd.DatetimeIndex,
-        sequence_id: str,
     ) -> tuple[
         dict[str, pd.DataFrame],
         dict[str, pd.DataFrame],
@@ -378,7 +359,6 @@ class RollingWindowBacktestEngine:
                 ruleset=ruleset,
                 dataset=spec.dataset,
                 training_cutoffs=training_cutoffs,
-                sequence_id=sequence_id,
                 label_as_of_date=cutoff.date(),
             )
             training_dataset = self.dataset_builder.build(
@@ -387,7 +367,6 @@ class RollingWindowBacktestEngine:
                     ruleset=ruleset,
                     dataset=spec.dataset,
                     cutoff_dates=[cutoff_date.date() for cutoff_date in training_cutoffs],
-                    sequence_id=sequence_id,
                     label_as_of_date=cutoff.date(),
                     target_transformer=target_transformer,
                 )
@@ -398,7 +377,6 @@ class RollingWindowBacktestEngine:
                     ruleset=ruleset,
                     dataset=spec.dataset,
                     cutoff_dates=[cutoff.date()],
-                    sequence_id=sequence_id,
                     label_as_of_date=None,
                     target_transformer=target_transformer,
                 )
@@ -420,7 +398,6 @@ class RollingWindowBacktestEngine:
         ruleset: Ruleset,
         dataset: DatasetConfig,
         training_cutoffs: pd.DatetimeIndex,
-        sequence_id: str,
         label_as_of_date: object,
     ) -> FittedTargetTransformer:
         if not requires_fitted_target_transformer(dataset.target_transform):
@@ -433,7 +410,6 @@ class RollingWindowBacktestEngine:
                 ruleset=ruleset,
                 dataset=raw_dataset,
                 cutoff_dates=[cutoff_date.date() for cutoff_date in training_cutoffs],
-                sequence_id=sequence_id,
                 label_as_of_date=label_as_of_date,
             )
         )
@@ -482,25 +458,6 @@ class RollingWindowBacktestEngine:
         ]
 
     @staticmethod
-    def _sequence_identity_from_gold(
-        gold_outputs: GoldBuildResult,
-        ruleset: Ruleset,
-        sequence_id: str,
-    ) -> dict[str, object]:
-        reference = gold_outputs.sequence_reference
-        if reference.empty or SEQUENCE_ID_COLUMN not in reference.columns:
-            return {}
-        matches = reference.loc[reference[SEQUENCE_ID_COLUMN].astype(str) == sequence_id]
-        if matches.empty:
-            return {}
-        row = matches.iloc[0]
-        return {
-            column: RollingWindowBacktestEngine._json_scalar(row[column])
-            for column in ruleset.sequence_columns
-            if column in row.index
-        }
-
-    @staticmethod
     def _skip_reason(training_frame: pd.DataFrame, inference_frame: pd.DataFrame) -> str:
         if training_frame.empty and inference_frame.empty:
             return "empty_training_and_inference_data"
@@ -513,8 +470,6 @@ class RollingWindowBacktestEngine:
         return {
             "realized_cash_in": len(gold_outputs.realized_cash_in),
             "known_movements_daily": len(gold_outputs.known_movements_daily),
-            "sequence_reference": len(gold_outputs.sequence_reference),
-            "calendar_daily": len(gold_outputs.calendar_daily),
         }
 
     @staticmethod
@@ -548,17 +503,6 @@ class RollingWindowBacktestEngine:
         if hasattr(value, "item"):
             return value.item()
         return value
-
-    @staticmethod
-    def _validate_one_sequence(frame: pd.DataFrame, sequence_id: str, frame_name: str) -> None:
-        if SEQUENCE_ID_COLUMN not in frame.columns:
-            raise ValueError(f"{frame_name} frame is missing {SEQUENCE_ID_COLUMN}.")
-        sequence_ids = frame[SEQUENCE_ID_COLUMN].astype(str).drop_duplicates().tolist()
-        if sequence_ids != [sequence_id]:
-            raise ValueError(
-                f"{frame_name} frame must contain only {SEQUENCE_ID_COLUMN}={sequence_id!r}, "
-                f"got {sequence_ids}."
-            )
 
     @staticmethod
     def _validate_model_compatibility(model: ForecastModel, config: BacktestConfig) -> None:

@@ -55,10 +55,10 @@ class DeepSktimeForecasterAdapter(SktimeForecasterAdapter):
 
 
 class NeuralForecastRNNModel(DeepSktimeForecasterAdapter):
-    """sktime NeuralForecast RNN wrapper for one selected D+1 sequence."""
+    """sktime NeuralForecast RNN wrapper for one D+1 Gold series."""
 
     model_name = "neuralforecast_rnn"
-    description = "sktime NeuralForecast RNN fitted on one selected sequence."
+    description = "sktime NeuralForecast RNN fitted on one Gold series."
     default_parameters = {
         "freq": "D",
         "input_size": 28,
@@ -89,10 +89,10 @@ class NeuralForecastRNNModel(DeepSktimeForecasterAdapter):
 
 
 class NeuralForecastLSTMModel(DeepSktimeForecasterAdapter):
-    """sktime NeuralForecast LSTM wrapper for one selected D+1 sequence."""
+    """sktime NeuralForecast LSTM wrapper for one D+1 Gold series."""
 
     model_name = "neuralforecast_lstm"
-    description = "sktime NeuralForecast LSTM fitted on one selected sequence."
+    description = "sktime NeuralForecast LSTM fitted on one Gold series."
     default_parameters = {
         "freq": "D",
         "input_size": 28,
@@ -123,10 +123,10 @@ class NeuralForecastLSTMModel(DeepSktimeForecasterAdapter):
 
 
 class PytorchForecastingTFTModel(DeepSktimeForecasterAdapter):
-    """sktime PyTorch Forecasting TFT wrapper for one selected D+1 sequence."""
+    """sktime PyTorch Forecasting TFT wrapper for one D+1 Gold series."""
 
     model_name = "pytorch_forecasting_tft"
-    description = "sktime PyTorch Forecasting TFT fitted on one selected sequence."
+    description = "sktime PyTorch Forecasting TFT fitted on one Gold series."
     default_parameters = {
         **_pytorch_forecasting_defaults(),
     }
@@ -138,10 +138,10 @@ class PytorchForecastingTFTModel(DeepSktimeForecasterAdapter):
 
 
 class PytorchForecastingDeepARModel(DeepSktimeForecasterAdapter):
-    """sktime PyTorch Forecasting DeepAR wrapper for one selected D+1 sequence."""
+    """sktime PyTorch Forecasting DeepAR wrapper for one D+1 Gold series."""
 
     model_name = "pytorch_forecasting_deepar"
-    description = "sktime PyTorch Forecasting DeepAR fitted on one selected sequence."
+    description = "sktime PyTorch Forecasting DeepAR fitted on one Gold series."
     default_parameters = {
         **_pytorch_forecasting_defaults(),
         "deterministic": True,
@@ -154,10 +154,10 @@ class PytorchForecastingDeepARModel(DeepSktimeForecasterAdapter):
 
 
 class PytorchForecastingNHiTSModel(DeepSktimeForecasterAdapter):
-    """sktime PyTorch Forecasting N-HiTS wrapper for one selected D+1 sequence."""
+    """sktime PyTorch Forecasting N-HiTS wrapper for one D+1 Gold series."""
 
     model_name = "pytorch_forecasting_nhits"
-    description = "sktime PyTorch Forecasting N-HiTS fitted on one selected sequence."
+    description = "sktime PyTorch Forecasting N-HiTS fitted on one Gold series."
     default_parameters = {
         **_pytorch_forecasting_defaults(),
     }
@@ -169,10 +169,10 @@ class PytorchForecastingNHiTSModel(DeepSktimeForecasterAdapter):
 
 
 class NBeatsModel(DeepSktimeForecasterAdapter):
-    """sktime PyTorch Forecasting N-BEATS wrapper for one selected D+1 sequence."""
+    """sktime PyTorch Forecasting N-BEATS wrapper for one D+1 Gold series."""
 
     model_name = "nbeats"
-    description = "sktime PyTorch Forecasting N-BEATS fitted on one selected sequence."
+    description = "sktime PyTorch Forecasting N-BEATS fitted on one Gold series."
     default_parameters = {
         **_pytorch_forecasting_defaults(),
     }
@@ -184,10 +184,10 @@ class NBeatsModel(DeepSktimeForecasterAdapter):
 
 
 class HFTransformersModel(DeepSktimeForecasterAdapter):
-    """sktime Hugging Face Transformers wrapper for one selected D+1 sequence."""
+    """sktime Hugging Face Transformers wrapper for one D+1 Gold series."""
 
     model_name = "hf_transformers"
-    description = "sktime Hugging Face Transformers forecaster fitted on one selected sequence."
+    description = "sktime Hugging Face Transformers forecaster fitted on one Gold series."
     default_parameters = {
         "model_path": "huggingface/informer-tourism-monthly",
         "fit_strategy": "minimal",
@@ -219,10 +219,10 @@ class HFTransformersModel(DeepSktimeForecasterAdapter):
 
 
 class ChronosModel(DeepSktimeForecasterAdapter):
-    """sktime Chronos wrapper for one selected D+1 sequence."""
+    """sktime Chronos wrapper for one D+1 Gold series."""
 
     model_name = "chronos"
-    description = "sktime Chronos forecaster fitted on one selected sequence."
+    description = "sktime Chronos forecaster fitted on one Gold series."
     default_parameters = {
         "model_path": "amazon/chronos-bolt-tiny",
         "seed": 1,
@@ -237,10 +237,10 @@ class ChronosModel(DeepSktimeForecasterAdapter):
 
 
 class MOIRAIModel(DeepSktimeForecasterAdapter):
-    """sktime MOIRAI wrapper for one selected D+1 sequence."""
+    """sktime MOIRAI wrapper for one D+1 Gold series."""
 
     model_name = "moirai"
-    description = "sktime MOIRAI forecaster fitted on one selected sequence."
+    description = "sktime MOIRAI forecaster fitted on one Gold series."
     default_min_observations = 90
     default_parameters = {
         "checkpoint_path": "sktime/moirai-1.0-R-small",
@@ -261,10 +261,10 @@ class MOIRAIModel(DeepSktimeForecasterAdapter):
 
 
 class TinyTimeMixerModel(DeepSktimeForecasterAdapter):
-    """sktime TinyTimeMixer wrapper for one selected D+1 sequence."""
+    """sktime TinyTimeMixer wrapper for one D+1 Gold series."""
 
     model_name = "tiny_time_mixer"
-    description = "sktime TinyTimeMixer forecaster fitted on one selected sequence."
+    description = "sktime TinyTimeMixer forecaster fitted on one Gold series."
     default_parameters = {
         "model_path": "ibm/TTM",
         "revision": "main",
@@ -281,10 +281,10 @@ class TinyTimeMixerModel(DeepSktimeForecasterAdapter):
 
 
 class PyKANForecasterModel(DeepSktimeForecasterAdapter):
-    """sktime PyKAN wrapper for one selected D+1 sequence."""
+    """sktime PyKAN wrapper for one D+1 Gold series."""
 
     model_name = "pykan_forecaster"
-    description = "sktime PyKAN forecaster fitted on one selected sequence."
+    description = "sktime PyKAN forecaster fitted on one Gold series."
     default_parameters = {
         "hidden_layers": (1, 1),
         "input_layer_size": 2,

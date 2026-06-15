@@ -54,8 +54,6 @@ def read_gold_outputs(input_path: str | Path) -> GoldBuildResult:
     return GoldBuildResult(
         realized_cash_in=pd.read_parquet(source_path / "realized_cash_in.parquet"),
         known_movements_daily=pd.read_parquet(source_path / "known_movements_daily.parquet"),
-        sequence_reference=pd.read_parquet(source_path / "sequence_reference.parquet"),
-        calendar_daily=pd.read_parquet(source_path / "calendar_daily.parquet"),
         manifest=BuildManifest.model_validate(manifest_payload),
     )
 
@@ -85,8 +83,6 @@ def write_gold_result(output_path: str | Path, result: GoldBuildResult) -> None:
         destination / "known_movements_daily.parquet",
         index=False,
     )
-    result.sequence_reference.to_parquet(destination / "sequence_reference.parquet", index=False)
-    result.calendar_daily.to_parquet(destination / "calendar_daily.parquet", index=False)
     _write_json(destination / "manifest.json", result.manifest.model_dump(mode="json"))
 
 

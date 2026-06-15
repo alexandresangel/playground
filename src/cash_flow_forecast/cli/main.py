@@ -21,10 +21,8 @@ from cash_flow_forecast.contracts import (
     build_default_schema,
 )
 from cash_flow_forecast.data_layers.gold import GoldBuilder
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN
 from cash_flow_forecast.data_layers.silver import SilverBuilder
 from cash_flow_forecast.dataset_building import DatasetBuilder
-from cash_flow_forecast.model_development.backtest_config import resolve_single_sequence_row
 
 
 DEFAULT_RULESET_PATH = Path("configs/rulesets/loreal_cash_in_v1.yaml")
@@ -64,7 +62,7 @@ def build_gold_main(argv: list[str] | None = None) -> int:
 
 
 def snapshot_dataset_main(argv: list[str] | None = None) -> int:
-    """Write a diagnostic one-sequence dataset snapshot from a backtest YAML."""
+    """Write a diagnostic dataset snapshot from a backtest YAML."""
 
     parser = argparse.ArgumentParser(
         description=(
@@ -73,7 +71,7 @@ def snapshot_dataset_main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument("--config-path", required=True, help="Backtest YAML containing dataset settings.")
-    parser.add_argument("--input-path", help="Override the YAML single-series Gold input folder.")
+    parser.add_argument("--input-path", help="Override the YAML Gold input folder.")
     parser.add_argument("--ruleset-path", help="Override the YAML ruleset path.")
     parser.add_argument("--output-root", default="data/datasets/snapshots")
     args = parser.parse_args(argv)
@@ -87,7 +85,6 @@ def snapshot_dataset_main(argv: list[str] | None = None) -> int:
     config = local_config.definition
     ruleset = load_ruleset_from_yaml(local_config.ruleset_path)
     gold_outputs = read_gold_outputs(local_config.input_path)
-    sequence_row = resolve_single_sequence_row(gold_outputs, ruleset, config.sequence)
     cutoff_dates = _date_range(config.evaluation.cutoff_start, config.evaluation.cutoff_end)
     label_as_of_date = _parse_date(config.evaluation.cutoff_end)
     builder = DatasetBuilder()
@@ -97,13 +94,11 @@ def snapshot_dataset_main(argv: list[str] | None = None) -> int:
             ruleset=ruleset,
             dataset=config.dataset,
             cutoff_dates=cutoff_dates,
-            sequence_id=str(sequence_row[SEQUENCE_ID_COLUMN]),
             label_as_of_date=label_as_of_date,
         )
     )
     snapshot_output_path = _snapshot_output_path(
         args.output_root,
-        sequence_id=str(sequence_row[SEQUENCE_ID_COLUMN]),
         dataset_kind=config.dataset.kind.value,
         config_name=config_path.stem,
     )
@@ -115,8 +110,8 @@ def run_backtest_main(argv: list[str] | None = None) -> int:
     """Run a local rolling-origin backtest."""
 
     parser = argparse.ArgumentParser(description="Run a local backtest.")
-    parser.add_argument("--config-path", required=True, help="YAML config for single-series D+1 backtests.")
-    parser.add_argument("--input-path", help="Override the YAML single-series Gold input folder.")
+    parser.add_argument("--config-path", required=True, help="YAML config for D+1 backtests.")
+    parser.add_argument("--input-path", help="Override the YAML Gold input folder.")
     parser.add_argument("--output-path", help="Override the YAML backtest output path.")
     parser.add_argument("--ruleset-path", help="Override the YAML ruleset path.")
     args = parser.parse_args(argv)
@@ -173,15 +168,13 @@ def _parse_date(value: str):
 def _snapshot_output_path(
     output_root: str | Path,
     *,
-    sequence_id: str,
     dataset_kind: str,
     config_name: str,
 ) -> Path:
-    """Return the local diagnostic snapshot folder for one sequence and config."""
+    """Return the local diagnostic snapshot folder for one config."""
 
     return (
         Path(output_root)
-        / _safe_path_part(sequence_id)
         / _safe_path_part(dataset_kind)
         / _safe_path_part(config_name)
     )

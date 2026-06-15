@@ -1,16 +1,14 @@
 from __future__ import annotations
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from cash_flow_forecast.contracts import BacktestConfig, DatasetConfig
-from cash_flow_forecast.contracts.builders import GoldBuildResult, ModelSpec
+from cash_flow_forecast.contracts.builders import ModelSpec
 from cash_flow_forecast.contracts.enums import DatasetKind
-from cash_flow_forecast.contracts.rules import Ruleset
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN
 from cash_flow_forecast.modeling.composites import SPECIAL_MODEL_NAMES, STACKING_MODEL_NAME
 from cash_flow_forecast.modeling.registry import model_spec_for_name
 from cash_flow_forecast.modeling.supervised import supervised_estimator_role
@@ -31,13 +29,6 @@ EVALUATION_CONFIG_KEYS = {
     "cutoff_end",
     "log_every_n_cutoffs",
     "train_window_days",
-}
-SEQUENCE_CONFIG_KEYS = {
-    "currency",
-    "entity",
-    "filters",
-    "movement_type",
-    "sequence_id",
 }
 RAW_TARGET_REGIME_MODEL_NAMES = {"lightgbm_zero_aware", "occurrence_spike_cascade"}
 
@@ -153,17 +144,6 @@ class BacktestEvaluationConfig:
 
 
 @dataclass(frozen=True)
-class BacktestSequenceConfig:
-    """Sequence-selection settings resolved to exactly one sequence."""
-
-    sequence_id: str | None = None
-    entity: str | list[str] | None = None
-    currency: str | list[str] | None = None
-    movement_type: str | None = None
-    filters: dict[str, list[str]] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
 class BacktestDefinition:
     """Pure top-level backtest definition independent from storage adapters."""
 
@@ -172,7 +152,6 @@ class BacktestDefinition:
     prediction_intervals_coverage: list[float]
     models: list[BacktestModelConfig]
     model_specs: list[ModelSpec]
-    sequence: BacktestSequenceConfig
     log_level: str = "INFO"
 
 
@@ -219,9 +198,8 @@ def parse_backtest_definition(raw_mapping: Mapping[str, Any]) -> BacktestDefinit
     _reject_unknown_keys(evaluation_raw, EVALUATION_CONFIG_KEYS, "`evaluation`")
 
     sequence_raw = raw.get("sequence") or {}
-    if "movement_types" in sequence_raw:
-        raise ValueError("Use a single `movement_type`; multi-sequence backtests are not supported.")
-    _reject_unknown_keys(sequence_raw, SEQUENCE_CONFIG_KEYS, "`sequence`")
+    if sequence_raw is not None and not isinstance(sequence_raw, dict):
+        raise ValueError("Legacy `sequence` must be a mapping when provided.")
 
     dataset = DatasetConfig.model_validate({**dataset_raw, "kind": dataset_kind})
     model_specs = [
@@ -245,43 +223,8 @@ def parse_backtest_definition(raw_mapping: Mapping[str, Any]) -> BacktestDefinit
         ),
         models=models,
         model_specs=model_specs,
-        sequence=BacktestSequenceConfig(
-            sequence_id=_as_optional_str(sequence_raw.get("sequence_id")),
-            entity=_as_str_or_list(sequence_raw.get("entity")),
-            currency=_as_str_or_list(sequence_raw.get("currency")),
-            movement_type=_as_optional_str(sequence_raw.get("movement_type")),
-            filters={key: _as_list(value) for key, value in (sequence_raw.get("filters") or {}).items()},
-        ),
         log_level=str(raw.get("log_level", "INFO")),
     )
-
-
-def resolve_single_sequence_row(
-    gold_outputs: GoldBuildResult,
-    ruleset: Ruleset,
-    sequence_config: BacktestSequenceConfig,
-) -> pd.Series:
-    """Return the only sequence row from already-filtered Gold outputs."""
-
-    _ = (ruleset, sequence_config)
-    sequence_reference = gold_outputs.sequence_reference.copy()
-    if sequence_reference.empty:
-        raise ValueError(
-            "Single-series Gold input must contain exactly one sequence in sequence_reference; got 0."
-        )
-    if SEQUENCE_ID_COLUMN not in sequence_reference.columns:
-        raise ValueError(
-            f"Single-series Gold input is missing {SEQUENCE_ID_COLUMN!r} in sequence_reference."
-        )
-
-    sequence_reference = sequence_reference.drop_duplicates(subset=[SEQUENCE_ID_COLUMN]).reset_index(drop=True)
-    if len(sequence_reference) != 1:
-        sequence_ids = sequence_reference[SEQUENCE_ID_COLUMN].astype(str).head(20).tolist()
-        raise ValueError(
-            "Single-series Gold input must contain exactly one sequence in sequence_reference; "
-            f"got {len(sequence_reference)}. Matched sequence ids: {sequence_ids}"
-        )
-    return sequence_reference.iloc[0]
 
 
 def to_backtest_config(
@@ -452,28 +395,6 @@ def _safe_custom_path_part(value: str) -> str:
     if safe in {"", ".", ".."}:
         raise ValueError("custom_name path segments must contain at least one safe character.")
     return safe
-
-
-def _as_optional_str(value: Any) -> str | None:
-    if value is None:
-        return None
-    return str(value)
-
-
-def _as_str_or_list(value: Any) -> str | list[str] | None:
-    if value is None:
-        return None
-    if isinstance(value, list):
-        return [str(item) for item in value]
-    return str(value)
-
-
-def _as_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return [str(item) for item in value]
-    return [str(value)]
 
 
 def _normalize_prediction_intervals_coverage(value: Any) -> list[float]:
