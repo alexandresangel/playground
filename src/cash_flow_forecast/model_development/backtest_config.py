@@ -261,54 +261,27 @@ def resolve_single_sequence_row(
     ruleset: Ruleset,
     sequence_config: BacktestSequenceConfig,
 ) -> pd.Series:
-    """Resolve friendly sequence config to exactly one sequence_reference row."""
+    """Return the only sequence row from already-filtered Gold outputs."""
 
+    _ = (ruleset, sequence_config)
     sequence_reference = gold_outputs.sequence_reference.copy()
-    filters = sequence_selection_filters(ruleset, sequence_config)
-    if not filters:
+    if sequence_reference.empty:
         raise ValueError(
-            "Sequence selection requires an explicit selector: use sequence_id or "
-            "entity/currency/movement_type filters."
+            "Single-series Gold input must contain exactly one sequence in sequence_reference; got 0."
         )
-    for column, allowed_values in filters.items():
-        if not allowed_values:
-            raise ValueError(f"Sequence filter {column!r} must contain at least one value.")
-        if column not in sequence_reference.columns:
-            raise ValueError(f"Sequence filter {column!r} is not in sequence_reference.")
-        sequence_reference = sequence_reference.loc[sequence_reference[column].isin(allowed_values)]
+    if SEQUENCE_ID_COLUMN not in sequence_reference.columns:
+        raise ValueError(
+            f"Single-series Gold input is missing {SEQUENCE_ID_COLUMN!r} in sequence_reference."
+        )
 
     sequence_reference = sequence_reference.drop_duplicates(subset=[SEQUENCE_ID_COLUMN]).reset_index(drop=True)
     if len(sequence_reference) != 1:
-        sequence_ids = (
-            sequence_reference[SEQUENCE_ID_COLUMN].astype(str).head(20).tolist()
-            if SEQUENCE_ID_COLUMN in sequence_reference.columns
-            else []
-        )
+        sequence_ids = sequence_reference[SEQUENCE_ID_COLUMN].astype(str).head(20).tolist()
         raise ValueError(
-            "Sequence selection must resolve to exactly one sequence; "
+            "Single-series Gold input must contain exactly one sequence in sequence_reference; "
             f"got {len(sequence_reference)}. Matched sequence ids: {sequence_ids}"
         )
     return sequence_reference.iloc[0]
-
-
-def sequence_selection_filters(
-    ruleset: Ruleset,
-    sequence_config: BacktestSequenceConfig,
-) -> dict[str, list[str]]:
-    filters: dict[str, list[str]] = {}
-    if sequence_config.sequence_id is not None:
-        filters[SEQUENCE_ID_COLUMN] = [sequence_config.sequence_id]
-
-    if sequence_config.entity is not None:
-        filters[ruleset.entity_column] = _as_list(sequence_config.entity)
-    if sequence_config.currency is not None:
-        filters[ruleset.currency_column] = _as_list(sequence_config.currency)
-    if sequence_config.movement_type is not None:
-        filters[ruleset.movement_scope_column] = [sequence_config.movement_type]
-
-    for column, allowed_values in sequence_config.filters.items():
-        filters[column] = allowed_values
-    return filters
 
 
 def to_backtest_config(

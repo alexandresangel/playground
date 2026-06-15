@@ -283,23 +283,11 @@ class DatasetBuilder:
         cutoff_date: pd.Timestamp,
         forecast_date: pd.Timestamp,
     ) -> dict[str, float]:
-        if context.all_known.empty:
-            return self._known_amount_count_features(
-                context.all_known,
-                prefix="CROSS_MOVEMENT_KNOWN",
-                request=request,
-            )
-
-        entity_column = request.ruleset.entity_column
-        currency_column = request.ruleset.currency_column
-        movement_column = request.ruleset.movement_scope_column
-        other_known = context.all_known.loc[
-            (context.all_known[entity_column] == context.sequence_row[entity_column])
-            & (context.all_known[currency_column] == context.sequence_row[currency_column])
-            & (context.all_known[movement_column] != context.sequence_row[movement_column])
-        ]
-        filtered = self._known_for_forecast_date(request, other_known, cutoff_date, forecast_date)
-        return self._known_amount_count_features(filtered, prefix="CROSS_MOVEMENT_KNOWN", request=request)
+        _ = (request, context, cutoff_date, forecast_date)
+        return {
+            "CROSS_MOVEMENT_KNOWN_AMOUNT_D1": 0.0,
+            "CROSS_MOVEMENT_KNOWN_COUNT_D1": 0,
+        }
 
     def _known_for_forecast_date(
         self,
@@ -381,7 +369,7 @@ class DatasetBuilder:
         sequence_row = self._sequence_row(gold.sequence_reference, request)
         calendar_daily = self._normalized_calendar(gold.calendar_daily)
         all_known = self._normalized_known(gold.known_movements_daily, request)
-        sequence_known = all_known.loc[all_known[SEQUENCE_ID_COLUMN].astype(str) == request.sequence_id].copy()
+        sequence_known = all_known.copy()
         label_panel = self._build_dense_label_panel(
             gold,
             request,
@@ -422,6 +410,7 @@ class DatasetBuilder:
         known = known_movements_daily.copy()
         if known.empty:
             return known
+        self._validate_single_series_rows(known, "known_movements_daily", request)
         for column in [request.ruleset.truth_date_column, request.ruleset.availability_date_column]:
             known[column] = pd.to_datetime(known[column]).dt.normalize()
         return known.sort_values(
@@ -453,11 +442,10 @@ class DatasetBuilder:
         return panel.sort_values(DATE_COLUMN).reset_index(drop=True)
 
     def _final_targets(self, gold: GoldBuildResult, request: DatasetBuildRequest) -> pd.DataFrame:
-        realized = gold.realized_cash_in.loc[
-            gold.realized_cash_in[SEQUENCE_ID_COLUMN].astype(str) == request.sequence_id
-        ].copy()
+        realized = gold.realized_cash_in.copy()
         if realized.empty:
             return pd.DataFrame(columns=[DATE_COLUMN, TARGET_AMOUNT_COLUMN])
+        self._validate_single_series_rows(realized, "realized_cash_in", request)
         realized[request.ruleset.truth_date_column] = pd.to_datetime(
             realized[request.ruleset.truth_date_column]
         ).dt.normalize()
@@ -502,6 +490,21 @@ class DatasetBuilder:
             request.ruleset.currency_column,
             request.ruleset.movement_scope_column,
         ]
+
+    @staticmethod
+    def _validate_single_series_rows(
+        dataframe: pd.DataFrame,
+        table_name: str,
+        request: DatasetBuildRequest,
+    ) -> None:
+        if SEQUENCE_ID_COLUMN not in dataframe.columns:
+            return
+        sequence_ids = dataframe[SEQUENCE_ID_COLUMN].astype(str).drop_duplicates().tolist()
+        if not set(sequence_ids).issubset({request.sequence_id}):
+            raise ValueError(
+                f"{table_name} must contain only {SEQUENCE_ID_COLUMN}={request.sequence_id!r} "
+                f"for single-series dataset builds; got {sequence_ids}."
+            )
 
     @staticmethod
     def _target_for_date(target_panel: pd.DataFrame, target_date: pd.Timestamp) -> float:

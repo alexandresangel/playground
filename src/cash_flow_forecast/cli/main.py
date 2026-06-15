@@ -72,8 +72,8 @@ def snapshot_dataset_main(argv: list[str] | None = None) -> int:
             "and never read these snapshot artifacts."
         )
     )
-    parser.add_argument("--config-path", required=True, help="Backtest YAML containing dataset and sequence settings.")
-    parser.add_argument("--input-path", help="Override the YAML Gold input path.")
+    parser.add_argument("--config-path", required=True, help="Backtest YAML containing dataset settings.")
+    parser.add_argument("--input-path", help="Override the YAML single-series Gold input folder.")
     parser.add_argument("--ruleset-path", help="Override the YAML ruleset path.")
     parser.add_argument("--output-root", default="data/datasets/snapshots")
     args = parser.parse_args(argv)
@@ -115,8 +115,8 @@ def run_backtest_main(argv: list[str] | None = None) -> int:
     """Run a local rolling-origin backtest."""
 
     parser = argparse.ArgumentParser(description="Run a local backtest.")
-    parser.add_argument("--config-path", required=True, help="YAML config for one-sequence D+1 backtests.")
-    parser.add_argument("--input-path", help="Override the YAML Gold input path.")
+    parser.add_argument("--config-path", required=True, help="YAML config for single-series D+1 backtests.")
+    parser.add_argument("--input-path", help="Override the YAML single-series Gold input folder.")
     parser.add_argument("--output-path", help="Override the YAML backtest output path.")
     parser.add_argument("--ruleset-path", help="Override the YAML ruleset path.")
     args = parser.parse_args(argv)

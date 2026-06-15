@@ -14,7 +14,6 @@ from cash_flow_forecast.adapters.base import ForecastingStorageAdapter
 from cash_flow_forecast.adapters.local.io import LocalForecastingStorageAdapter
 from cash_flow_forecast.adapters.local.rules import load_ruleset_from_yaml
 from cash_flow_forecast.contracts.rules import Ruleset
-from cash_flow_forecast.data_layers.gold.builder import SEQUENCE_ID_COLUMN
 from cash_flow_forecast.model_development.backtest_config import (
     BacktestDefinition,
     parse_backtest_definition,
@@ -128,16 +127,10 @@ def configure_loguru(level: str = "INFO") -> None:
 
 
 def sequence_output_path(output_root: str | Path, sequence_row: pd.Series, ruleset: Ruleset) -> Path:
-    """Return the local output folder for one selected sequence."""
+    """Return the local output folder for already-scoped single-series backtests."""
 
-    entity = str(sequence_row[ruleset.entity_column])
-    currency = str(sequence_row[ruleset.currency_column])
-    movement_scope = str(sequence_row[ruleset.movement_scope_column])
-    return (
-        Path(output_root)
-        / f"{_safe_path_part(entity)}_{_safe_path_part(currency)}"
-        / _safe_path_part(movement_scope)
-    )
+    _ = (sequence_row, ruleset)
+    return Path(output_root)
 
 
 def run_output_path(
@@ -150,7 +143,8 @@ def run_output_path(
 ) -> Path:
     """Return the local output folder for one model/custom-name run."""
 
-    return sequence_output_path(output_root, sequence_row, ruleset) / _model_custom_leaf(
+    _ = (sequence_row, ruleset)
+    return Path(output_root) / _model_custom_leaf(
         model_name,
         custom_name,
     )
