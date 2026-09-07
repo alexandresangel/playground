@@ -1,0 +1,105 @@
+Analyze the provided financial trade document and generate an XML output following the tradeMoneyMarket schema. Extract only the following key elements if explicitly present in the document:
+
+Essential trade details:
+- Entity (company name)
+- Counterparty (bank name)
+- Trade date
+- Maturity date
+- Currency code
+- Amount (nominal)
+- Interest type (Linear/Actuarial)
+- Basis calculation (ACT/365, 30E/360, etc.)
+
+Payment structure:
+- Interest frequency (1M, 3M, 6M, 12M, or 'IF' for in fine)
+- First interest payment date (find in the schedule table, the date of the first row in which an interest is payed, and for that look at the columns which contain the word which corresponds in the document language to "interest")
+
+Interest details:
+- Fixed/Floating rate indicator
+- Rate reference (e.g., EURIBOR3M) if floating
+- Fixed rate value (if applicable)
+- Capitalized if the document specified that interests are capitalized (In this case, the nominal value of the transaction increases after each interest calculation)
+- Spread if the document specified a value of spread to add to the fixed rate or to the reference rate 
+
+
+Critical interest-rate XML rules (use exactly one pattern):
+- Floating/indexed: <isFixed>false</isFixed>, <rate shortname="INDEX_SHORTNAME"/> (e.g. EURIBOR3M), numeric <spread>. Never output <fixedRate>. Never put an index name in <fixedRate>.
+- Fixed: <isFixed>true</isFixed>, numeric <fixedRate> only. Never output <rate>.
+
+Floating example:
+  <isFixed>false</isFixed>
+  <rate shortname="EURIBOR3M"/>
+  <spread>0</spread>
+
+Fixed example:
+  <isFixed>true</isFixed>
+  <fixedRate>3.5</fixedRate>
+
+Generate XML output using this template (append the floating or fixed interest fragment above, not both):
+
+<tradeMoneyMarket gracePeriod="" interestGracePeriod="">
+  <entity name="[ENTITY]"/>
+  <cpty name="[COUNTERPARTY]"/>
+  <tradeDate>[TRADE_DATE]</tradeDate>
+  <maturityDate>[MATURITY_DATE]</maturityDate>
+  <currency1 shortname="[CURRENCY]"/>
+  <amount1>[AMOUNT]</amount1>
+  <basis shortname="[BASIS]"/>
+  <frequency shortname="[INTEREST_FREQ]" customDictionaryName="frequency"/>
+  <firstCouponDate>[FIRST_INTEREST_DATE]</firstCouponDate>
+  <interestType shortname="[INTEREST_TYPE]" customDictionaryName="interestType"/>
+</tradeMoneyMarket>
+
+
+Only generate the xml, nothing else. Do not include a <tradeType> element; the application adds it from the user's selection. Only include elements where values are explicitly found in the document. Skip any elements where information is uncertain or missing. Format all dates as ISO 8601 (YYYY-MM-DDTHH:MM:SS.SSSZ).
+If the PDF cannot be parsed (e.g., no extractable text, unreadable/corrupted content, or parsing failure), output exactly the following single-line XML and nothing else:
+<error code="422" reason="UNPARSABLE_DOCUMENT"/>
+
+
+*************************************************************
+Specific rules for this trade type to complete the input mask
+
+  - All fields not described below are let empty or initialized by the default values
+
+  - From [ENTITY] we fetch in Configuration/Entities/Entity an active internal entity with a similar name
+  - Once the Internal Entity is found, we fetch in Configuration / Other static data / Folders / Folder the first active folder which has the internal entity found in the previous step
+  - If a match is found, we fill in the field "Folder" with the value found
+     - Else, we let the field "Folder" empty
+  
+  - From [COUNTERPARTY] we fetch in Configuration/Entities/Entity an active entity with option "Counterparty" = True with a similar name
+  - If a match is found, we fill in the field "Counterparty" with the value found
+     - Else, we let the field "Counterparty" empty
+
+  - Field "Currency" is filled in with [CURRENCY]
+  
+  - Field "Basis" is filled in with [BASIS]
+  
+  - Field "Frequency" is filled in with [INTEREST_FREQ]
+  
+  - Field "Trade date" is filled in with [TRADE_DATE]
+  
+  - Field "Value date" is calculated from the [TRADE_DATE] (during the manual input, the value date takes automatically the value of the trade date)
+  
+  - Field "Issue date": for this field we must add an automatic action: report automatically the value of the trade date (as for the value date)
+  
+  - Field "Maturity date" is filled in with [MATURITY_DATE]
+  
+  - Field "First coupon date" is filled in with [FIRST_INTEREST_DATE]
+  
+  - Field "Face amount" is filled in with [AMOUNT]
+  
+  - Check box "Fixed issue rate" is TRUE if <isFixed> = true
+	- Else, check box is FALSE
+
+  -	Field "Floating rate" is filled in with [RATE_REF]
+  
+  - Field "spread(bps)" is filled in with [SPREAD]
+  
+  - Field "Trade rate" automatically takes on the value of the client rate 
+  
+  - Field "Interest type" is filled in with [INTEREST_TYPE]
+  
+  - Once the fields are filled in, we automatically trigger the action "Compute gross amount" (like if the user was clicking on the button "Compute gross amount" of the input mask.
+    This action fills in the field "Gross amount"
+*************************************************************
+

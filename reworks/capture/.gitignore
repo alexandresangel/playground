@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+config.json
+jwt_keystore.p12
+data/
+deploy/.terraform/
+deploy/.terraform-modules/
+deploy/*.tfstate*
+deploy/*.tfplan
+

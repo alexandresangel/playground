@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [dev, test]
+        default: dev
+      image_tag:
+        description: Existing dev image tag to promote (required for test)
+        required: false
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  GITHUB_REGISTRY: containers.diapason.ghe.com
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    environment: ${{ github.event_name == 'release' && 'prod' || inputs.environment }}
+    steps:
+      - name: Resolve target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == release ]]; then
+            echo "env=prod" >>"$GITHUB_OUTPUT"
+            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "skip_build=1" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.environment }}" == test ]]; then
+            [[ -n "${{ inputs.image_tag }}" ]] || { echo "image_tag is required for test" >&2; exit 1; }
+            echo "env=test" >>"$GITHUB_OUTPUT"
+            echo "image_tag=${{ inputs.image_tag }}" >>"$GITHUB_OUTPUT"
+            echo "skip_build=1" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ inputs.image_tag }}" >>"$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >>"$GITHUB_OUTPUT"
+            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "skip_build=0" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.checkout_ref }}
+      - uses: diapason/actions/service-deploy/login-azure@main
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy
+        env:
+          IMAGE_TAG: ${{ steps.target.outputs.image_tag }}
+          SKIP_BUILD: ${{ steps.target.outputs.skip_build }}
+          GITHUB_REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          INFISICAL_URL: ${{ secrets.INFISICAL_URL }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+        run: bash deploy/deploy.sh "${{ steps.target.outputs.env }}"
+      - uses: diapason/actions/service-deploy/logout-azure@main
+        if: always()
+

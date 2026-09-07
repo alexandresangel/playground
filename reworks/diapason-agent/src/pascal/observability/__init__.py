@@ -1,0 +1,1 @@
+"""Loki/Tempo OTLP compatibility."""

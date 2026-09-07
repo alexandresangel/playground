@@ -1,0 +1,399 @@
+/* Diapason Agent — Pascal launcher (logo PNG assets) */
+
+:root {
+  --dia-pink: #f20f4b;
+  --dia-orange: #ffb03e;
+  --dia-cyan: #2fc7ea;
+  --dia-gradient: linear-gradient(
+    90deg,
+    #f20f4b 0%,
+    #ffb03e 50%,
+    #2fc7ea 100%
+  );
+  --dia-navy: #1a2b56;
+}
+
+/* —— Button (logo image / SVG) —— */
+
+.da-dia-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.25rem 0.35rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
+  line-height: 0;
+}
+
+.da-dia-btn:hover {
+  background: rgba(47, 199, 234, 0.08);
+  transform: translateY(-1px);
+}
+
+.da-dia-btn:focus-visible {
+  outline: 2px solid var(--dia-cyan);
+  outline-offset: 2px;
+}
+
+.da-dia-logo-img {
+  display: block;
+  height: 2rem;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  object-position: left center;
+  background: transparent;
+}
+
+.da-dia-logo-img--header {
+  height: 1.625rem;
+}
+
+.da-dia-btn--header .da-dia-logo-img--header {
+  height: 1.5rem;
+}
+
+.da-dia-btn--fab {
+  position: fixed;
+  z-index: 2147483000;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: 0 2px 12px rgba(26, 43, 86, 0.12);
+}
+
+.da-dia-btn--fab:hover {
+  box-shadow: 0 4px 16px rgba(242, 15, 75, 0.2);
+}
+
+.da-dia-btn--fab .da-dia-logo-img {
+  height: 2rem;
+}
+
+.da-widget-launcher[hidden],
+.da-widget-root.da-widget-open .da-widget-launcher {
+  display: none;
+}
+
+/* —— Dialog —— */
+
+.da-widget-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  background: rgba(14, 31, 74, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.da-widget-root.da-widget-open .da-widget-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.da-widget-dialog {
+  position: fixed;
+  z-index: 2147483002;
+  left: 50%;
+  top: 50%;
+  width: min(920px, calc(100vw - 2rem));
+  height: min(720px, calc(100vh - 4rem));
+  min-width: 360px;
+  min-height: 320px;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100vh - 1rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+  box-shadow: 0 24px 64px rgba(14, 31, 74, 0.28);
+  resize: none;
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.da-widget-root.da-widget-open .da-widget-dialog {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.da-widget-root.da-widget-open .da-widget-dialog.da-widget-dialog--maximized,
+.da-widget-root.da-widget-open .da-widget-dialog.da-widget-dialog--placed {
+  transform: none;
+}
+
+.da-widget-dialog.da-widget-dialog--maximized {
+  resize: none;
+  border-radius: 8px;
+}
+
+.da-widget-dialog.da-widget-dialog--maximized .da-widget-resize-handle {
+  display: none;
+}
+
+.da-widget-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: #fff;
+  color: var(--dia-navy);
+  cursor: default;
+  user-select: none;
+  border-bottom: none;
+}
+
+.da-widget-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem 0.55rem 1rem;
+}
+
+.da-widget-header-gradient {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 4px;
+  background: var(--dia-gradient);
+}
+
+.da-widget-header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.da-widget-header-brand > .da-dia-logo-img {
+  height: 1.75rem;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.da-widget-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.da-widget-title {
+  margin: 0;
+  font:
+    600 0.95rem/1.25 "Segoe UI",
+    system-ui,
+    -apple-system,
+    Roboto,
+    sans-serif;
+  color: var(--dia-navy);
+}
+
+.da-widget-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.da-widget-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  color: var(--dia-navy);
+  background: transparent;
+  cursor: pointer;
+}
+
+.da-widget-icon-btn:hover {
+  background: rgba(47, 199, 234, 0.1);
+  color: var(--dia-pink);
+}
+
+.da-widget-icon-btn:focus-visible {
+  outline: 2px solid var(--dia-cyan);
+  outline-offset: 1px;
+}
+
+.da-widget-icon-glyph {
+  display: block;
+  box-sizing: border-box;
+}
+
+.da-widget-icon-glyph--maximize {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+}
+
+.da-widget-icon-glyph--restore {
+  position: relative;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.da-widget-icon-glyph--restore::before,
+.da-widget-icon-glyph--restore::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.da-widget-icon-glyph--restore::before {
+  left: 0;
+  top: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
+.da-widget-icon-glyph--restore::after {
+  right: 0;
+  bottom: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+}
+
+.da-widget-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: #fff;
+}
+
+.da-widget-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.da-widget-resize-handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.da-widget-resize-handle--n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: n-resize;
+}
+
+.da-widget-resize-handle--s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: s-resize;
+}
+
+.da-widget-resize-handle--e {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: e-resize;
+}
+
+.da-widget-resize-handle--w {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: w-resize;
+}
+
+.da-widget-resize-handle--nw {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nw-resize;
+}
+
+.da-widget-resize-handle--ne {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: ne-resize;
+}
+
+.da-widget-resize-handle--sw {
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: sw-resize;
+}
+
+.da-widget-resize-handle--se {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: se-resize;
+}
+
+@media (max-width: 640px) {
+  .da-widget-icon-btn[data-da-maximize],
+  .da-widget-resize-handle {
+    display: none;
+  }
+
+  .da-widget-dialog {
+    left: 0.5rem;
+    top: 0.5rem;
+    width: calc(100vw - 1rem);
+    height: calc(100vh - 1rem);
+    transform: none;
+    resize: none;
+  }
+
+  .da-widget-root.da-widget-open .da-widget-dialog {
+    transform: none;
+  }
+
+  .da-dia-logo-img {
+    height: 1.5rem;
+  }
+
+  .da-widget-header-brand {
+    gap: 0.5rem;
+  }
+
+  .da-widget-title {
+    font-size: 0.85rem;
+  }
+
+  .da-widget-header-gradient {
+    height: 3px;
+  }
+}
