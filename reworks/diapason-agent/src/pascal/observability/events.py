@@ -2,29 +2,14 @@
 
 import json
 import logging
-from contextlib import contextmanager
 
 from opentelemetry import trace
 
 from pascal.agent.budget import cost_usd
+from pascal.compatibility import completion_prefix
+from pascal.observability.telemetry import record_turn
 
-tracer = trace.get_tracer("diapason_agent")
 log = logging.getLogger("diapason.chat")
-
-
-@contextmanager
-def operation(name: str):
-    # Disabling exception events alone is insufficient: OTel also puts exception
-    # text in Status.description unless set_status_on_exception is disabled.
-    with tracer.start_as_current_span(
-        name, record_exception=False, set_status_on_exception=False
-    ) as span:
-        try:
-            yield span
-        except BaseException as exc:
-            span.set_attribute("error.type", type(exc).__name__)
-            span.set_status(trace.Status(trace.StatusCode.ERROR))
-            raise
 
 
 def safe_arguments(value):
@@ -59,17 +44,18 @@ def completion(identity, session_id, outcome, config, duration_ms, prompt_versio
             f"{storage.get('chat_container', 'chat-sessions')}/{blob}"
         )
     context = trace.get_current_span().get_span_context()
-    fields = dict(
-        customer=identity.customer_id,
-        user=identity.user_id,
+    record_turn(outcome.status, first_token_ms=outcome.first_token_ms)
+    fields = completion_prefix(
+        identity,
+        session_id,
+        outcome.usage,
+        cost_usd(outcome.usage, config.get("azure_openai", {})),
+        ",".join(dict.fromkeys(t["name"] for t in outcome.traces)),
+        (outcome.receipt or {}).get("operation", ""),
+    )
+    fields.update(
         instance=identity.instance,
-        session=session_id,
-        tokens_in=outcome.usage.get("input", 0),
-        tokens_out=outcome.usage.get("output", 0),
         cached_tokens=outcome.usage.get("cached_input", 0),
-        cost_usd=cost_usd(outcome.usage, config.get("azure_openai", {})),
-        tools=",".join(dict.fromkeys(t["name"] for t in outcome.traces)),
-        skills=(outcome.receipt or {}).get("skill", ""),
         blob=blob,
         status=outcome.status,
         persisted=outcome.persisted,

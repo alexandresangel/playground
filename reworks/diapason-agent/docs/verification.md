@@ -1,152 +1,106 @@
-# Local verification and handoff — 2026-09-07
+# Pascal local verification — 2026-09-08
 
-The Pascal core rework is implemented in `reworks/diapason-agent`. This report records local
-implementation evidence, not deployment, product acceptance or a live-model quality score. No
-cloud resource, remote prompt, backend endpoint, MCP server or legacy source was changed.
+This report supersedes the 2026-09-07 report for the earlier pending rework. The original code remains
+current. These are local implementation checks, **not an Azure deployment or real-model/business
+acceptance**. All CAP/PAS-R001–R006 release gates remain open for their designated owners.
 
-## Requirement-to-evidence map
+## Layout follow-up — 2026-09-09
 
-| Requested outcome | Implementation and local evidence | Remaining acceptance |
-|---|---|---|
-| Clean, simple, modular LangGraph core | One compiled graph in `agent/graph.py`; `ChatService` owns both JSON and SSE; injectable model/MCP/store ports; import and graph/API tests | Maintainer review; no framework-driven memory migration |
-| Address the existing audit without redesigning surrounding systems | Every A1–I3 issue mapped in `audit-disposition.md` to a delivered task or separately owned follow-up | External security/storage/product decisions in `NEXT_STEPS.md` |
-| Keep current security logic | Preserved JWT issuer/RS256/role/customer/revocation behavior and Fernet payload; real locally generated RSA/PKCS#12 tests; scoped cache/forwarding/cookie-isolation negatives | Actual corporate key/RBAC, trusted integration headers and accepted legacy risks: R002/R006 |
-| Keep existing MCP/session/UI boundaries | Stateless JSON/SSE MCP adapter tested against actual SDK server; legacy-shaped Blob adapter/API tests; Capture HTTP result and identity forwarding tests; unchanged layout/event contracts | Real MCP/Blob/Diapason host: R002/R003 |
-| Same Loki/Tempo compatibility with improved visibility | Same signal endpoint/env/header semantics; real local OTLP exporter traffic and protobuf decoding; ingress/downstream W3C; safe span/log and ambient-tracing privacy tests | Actual collector routing and trace inspection: R004 |
-| Precise user stories/tasks | Six stories, 16 tasks and six separate release gates in Pascal's board; Capture board expanded to six stories, 20 tasks and six gates, with ACs/roles/dependencies/estimates/evidence | Assign people, sprint dates and reviewers; do not equate local verification with acceptance |
-| Next steps/future improvements | `NEXT_STEPS.md`: 13 prioritized, owned follow-ups with dependencies and acceptance evidence | Team prioritization and approval |
-| Do not edit the legacy project | Final SHA256 comparison: all 90 files outside `reworks` match the pre-work baseline; no added or missing files | Repeat against the team's eventual commit |
+Common primitives now live inside each application's own package, at matching responsibility-based
+paths. Source/import/package changes retain behavior. The former manifest-only test was removed;
+behavioral tests remain. The E01–E06 evidence below is the September 8 baseline, not a claim that
+those exact historical images contain the new layout.
 
-Paths to code/tests below are relative to this standalone project's root; implementation modules are
-under `src/pascal`. E01–E07 are stable evidence IDs referenced by `SPRINT.md`.
+Current follow-up results:
 
-## E01 — Python behavior and boundary regressions
+- Windows Python 3.12.9: **88 passed** (7.33s); Linux Python 3.12.14: **88 passed** (4.93s).
+  Only the obsolete manifest test was removed. Behavioral adapter, security and telemetry tests remain.
+- Ruff check/format, locked dependency compatibility, source distribution and wheel builds passed.
+  Wheel Python members match current source, with only the application's own package namespace.
+- Five matching local module pairs were checked byte-for-byte; all are identical. This was a one-time
+  verification, not a new sync/parity framework. See [reuse](reuse.md).
+- Built `pascal:layout-test` and `pascal:layout-runtime`; the runtime's offline/non-root
+  `scripts/container_check.py` passed with `--network none` and a read-only script mount.
+  Revision label is `layout-local`. No image was pushed and no cloud deployment was performed.
+- The workspace audit passed: all 90 original files and 18 frozen frontend/static files unchanged;
+  wheel membership, local documentation links, workflow/HCL syntax and sprint structure checked.
+- Obsolete source trees and their bytecode-only/empty directories were removed. Implementations
+  remain in the new local paths; no compatibility import shims or common package remains.
 
-Windows, Python 3.12.9, uv 0.9.0:
+## E01 — Python and contract checks
 
-```powershell
-uv run --locked --extra dev pytest --junitxml=pytest-report.xml
-```
+Windows Python 3.12.9 / uv 0.9.0: `uv run --locked --extra dev pytest` passed **89 tests**
+(7.72s). Both suites use explicit fixtures and loopback servers, not corporate credentials.
+Linux Python 3.12.14 also runs the test stage; final result is recorded below.
 
-Result: **65 passed**, 6.43 seconds. The generated JUnit file is local/ignored; CI uploads its own
-report. The same 65 tests passed in the Linux test image under Python 3.12.14, including a second
-network-disabled run (4.17 seconds). One upstream Starlette/AnyIO `BlockingPortal` deprecation
-warning remains. The final 3.14 matrix has not run; earlier partial suites did, but are not substituted
-for that CI gate.
+- Agent graph/API: one JSON/SSE loop, validated tools, whole-turn context, call/round/argument/output/cost limits, sources, usage and null chart compatibility.
+- Lifecycle: admission/session exclusion, total/model deadlines, disconnect before producer entry/during stream/tool/persist, partial outcome, single append and owned shutdown.
+- MCP: official SDK initialize/negotiation/teardown against four actual FastMCP stateful/stateless × JSON/SSE fixtures; scoped cookies/headers/cache, qualified routing/pagination/audience, bad IDs/errors/size and gzip expansion.
+- Tool safety: unknown/invalid calls never dispatch, external ref/dynamicRef/recursiveRef schemas rejected with no downloader, bounded sanitized errors, no automatic mutation retries.
+- Security/session/Capture: local real RSA/JWT roles/revocation/customer checks, legacy Fernet payload, tenant partitions, retained Blob record contracts, minimal new capture_receipt and filtered old private records; composer HTTP bridge.
+- Actual OpenAI SDK: shared v1/dated routes, scoped configured auth, fragmented tool-call streams, usage/cached tokens and bounded retry settings; no live model request.
+- Observability: actual local protobuf logs/traces/metrics, W3C and log correlation, exact original Grafana prefix order, privacy/labels and disabled ambient LangSmith.
+- Naming/local code: old Python feature names only in compatibility.py; local adapters are behavior-tested.
 
-Coverage by test module (scenario coverage, not a measured line-coverage percentage):
+Scenario coverage is not a measured line-coverage percentage or proof of every production failure.
+One upstream Starlette/AnyIO BlockingPortal deprecation warning remains; no application test failure.
+The configured Pascal 3.14 CI matrix has not been executed in organization CI for this revision.
 
-- `test_graph.py`: graph loop, invalid/hallucinated tools, sanitized tool failures, budget pruning,
-  limits, partial responses and session exclusion.
-- `test_lifecycle.py`, `test_additional_guards.py`: disconnect before producer entry, during model/tool
-  execution and persistence, shutdown, single append, interrupted-tool receipt, total/model deadlines,
-  admission/call/argument/message/output/cost guards, forbidden external schema references, price
-  validation, prompt refresh/hash and disabled ambient LangSmith tracing.
-- `test_api.py`: JSON/SSE public fields, scoped sessions, JWT roles/customer/revocation and locale.
-- `test_mcp.py`: decrypted legacy Fernet payload, stable credential-partitioned cache, no identity
-  broadcast, TTL/LRU/dedup, pagination/cycle/page/row bounds, routing, JSON/SSE and cookie isolation.
-- `test_mcp_protocol.py`: actual pinned FastMCP SDK's stateless HTTP transport, not only a hand-written
-  JSON mock. This is not a claim of support for stateful MCP session protocols.
-- `test_model.py`: actual Azure OpenAI SDK with a fixture stream, fragmented tool arguments,
-  cached-token usage, explicit temperature/output/retry options. No live Azure request.
-- `test_compatibility.py`: missing-record Blob append regression, legacy-shaped records and Capture
-  multipart/public XML passthrough with a minimal transcript receipt. No live Blob/backend request.
-- `test_observability.py`, `test_exporters.py`: the E05 checks below.
+## E02 — Quality, reusable code and packages
 
-## E02 — Static and package checks
+`ruff check src tests scripts`, `ruff format --check src tests scripts`, `uv pip check`
+and `uv build --no-sources` passed. 102 installed packages are compatible.
+Mypy passed its declared scope of config.py, agent/state.py and ports.py (three files); this is not full-project typing. Retained compatibility files remain explicitly excluded from Ruff.
 
-```powershell
-uv run --locked --extra dev ruff check src tests scripts
-uv run --locked --extra dev ruff format --check src tests scripts
-uv run --locked --extra dev mypy
-uv pip check
-uv build --no-sources
-```
+The common-package manifest test was removed with that packaging model. Each application runs its
+own local adapter tests. See [intentional duplication](reuse.md). Wheel/source distributions built;
+the workspace artifact
+audit compares wheel Python members to current source to reject stale removed modules.
+Use the complete repository/Docker artifact for runtime non-Python assets.
 
-All passed: 43 lint/format-targeted files, three mypy-targeted files, 102 compatible installed
-packages; wheel and source distribution built. Mypy intentionally checks only `config.py`,
-`agent/state.py` and `ports.py`; it is **not full-project static typing**. Compatibility copies are
-excluded from Ruff rather than mechanically rewriting security/storage code.
+uv.lock SHA256: `64f33749d011122cb84aeb19ccb8b7275701f07bdb1bfe292c69961359275351`.
 
-The Python wheel contains the package and locale bundles. Deploy the complete repository/Docker
-artifact for the static UI and runtime prompt; the wheel alone is not the complete web distribution.
+## E03 — Containers
 
-## E03 — Linux images and offline runtime
+Built the Linux test stage and independent non-root runtime. Runtime checks ran with `--network none`
+and the read-only `scripts/container_check.py` mount, confirming UID/GID 10001, no baked local
+configuration/keystore, offline import/lifespan and health/readiness.
+Pascal additionally verifies its preloaded tokenizer, locale/index and static assets. npm ci/build ran inside Docker, not in the frozen workspace frontend.
+Injected/disabled dependencies isolate packaging; these are not real authenticated-service smoke tests.
 
-```powershell
-docker build --target test -t pascal-rework:test .
-docker run --rm --network none --entrypoint /app/.venv/bin/pytest pascal-rework:test
-docker build --build-arg GIT_REVISION=local-verification -t pascal-rework:local .
-$pascalChecks = (Resolve-Path scripts).Path
-docker run --rm --network none --mount "type=bind,source=$pascalChecks,target=/checks,readonly" --entrypoint python pascal-rework:local /checks/container_check.py
-```
+Runtime tag: `pascal:refinement-runtime`; Docker image ID: `sha256:a22fb22ea61cfd6a37137e0faaebf46970f9e19b1a4907153c879124c40c8198`.
+Revision label: `refinements-local`, not a fabricated Git SHA. Nothing was pushed to a registry.
+Test-image runs use `docker build --target test`; see deployment.md for reproducible commands.
+Linux suite result: **89 passed**, 4.97s.
 
-Both images built successfully. The runtime check passed: UID/GID **10001:10001**, no baked local
-config/key, offline tokenizer/import, injected lifespan startup, `/health`, `/ready`, `/api/i18n`,
-index and JavaScript assets. Test doubles isolate startup from external credentials; this is not a
-real authenticated application smoke. Docker HEALTHCHECK is not proof of ACA probe configuration.
+## E04 — Provenance and frozen boundaries
 
-Local runtime image ID (manifest list reported by Docker):
-`sha256:61f28c052f7800e3d17232f9105532dc7b9b83f2c51464f6f86c06e05767245e`.
-Revision label: `local-verification`, not a fabricated Git SHA. No registry push occurred. Record the
-actual commit and registry digest after extraction/CI. Runtime `uv.lock` SHA256:
-`02c1823280ede59028f99e7502edf542553e4477a378b5501b441c742507c771`.
+`docs/provenance.md` inventories retained/refactored/added/removed production sections and operational
+files against original sources, including earlier Pascal frontend changes. Capture's catalog plus
+seven prompts are byte-identical to their original source manifest.
+`reworks/source-baseline.json` records the pre-refinement original and frontend hashes;
+`reworks/verify_workspace.py` checks all 90 original files, no original additions/removals, and all
+18 frozen frontend/static baseline files. No moderation implementation or original/backend edit.
 
-## E04 — Frontend checks and explicit visual limitation
+## E05 — Deployment and document artifacts
 
-From `frontend`: `npm ci`, `npm run build`, `npm audit --audit-level=moderate`,
-`node --check src/chat-app.js` and `node --check src/boot.js` all passed. npm reported **zero
-vulnerabilities** on this date; this is not a perpetual security guarantee. The vendor bundle is
-62.5 KiB after removing unused sample-chart code and patching DOMPurify.
+Both deployment workflows depend on quality; YAML/HCL/config syntax checks are local only. The
+sprint boards now use three stories, explicit Description/Acceptance criteria and 14 technical tasks
+with Description/Status each. Local document links and wheel membership are checked by
+`reworks/verify_workspace.py`. Linux `bash -n` checks cover the deployment shell scripts.
 
-Copied HTML/CSS/image assets and the `dia-agent-open-trade` payload were inspected for parity.
-Integration edits only add Capture command aliases, consume canonical final SSE text and remove
-fabricated chart rendering. HTTP asset delivery passed in E03. The browser skill found **no connected
-browser**, so no screenshots, visual interaction or real host trade-opening acceptance is claimed.
-Keep PAS-R003/CAP-R003 open until QA checks the actual embedding with approved PDFs.
+Metrics endpoint/header variables can be supplied to deploy.sh independently of the private helper:
+the endpoint/protocol are app environment values; explicit metrics auth headers become an ACA secret
+reference. Supply them through the approved CI secret/config injection; no new secret was provisioned.
+Loki/Tempo settings are retained. SRE must inspect the actual resulting environment and signal routing.
 
-## E05 — Observability interoperability
+## E06 — What remains external
 
-`test_exporters.py` runs `scripts/telemetry_check.py` in an isolated process against an actual
-loopback HTTP collector. OTLP protobuf logs and spans arrived at the configured full signal URLs,
-with expected Bearer/tenant headers and a matching log/model-span trace ID. No real token or remote
-collector was used. Separate tests verify ingress W3C parentage, downstream propagation, suppressed
-ambient HTTP header capture, no raw error message in spans/logs, and disabled LangSmith tracing.
-These validate the adapter; PAS-R004 still requires a real Tempo/Loki inspection.
+Organization CI execution, private ACA helper/module plan and state ownership, approved secrets/RBAC,
+real Azure deployment/client compatibility, corporate MCP/Blob/REST, actual embedded UI/PDF behavior,
+real Loki/Tempo/metrics routing, SME model/extraction quality and load/security acceptance remain open.
+No Terraform init/validate/plan/apply, secret upload, remote prompt change, production smoke or rollout
+is claimed. The read-only evaluation seeds/scripts do not establish a quality score.
 
-## E06 — Deployment/configuration artifacts
-
-`uv run --locked --extra dev python scripts/validate_artifacts.py` passed: Terraform HCL, workflow
-YAML and configuration/evaluation/npm JSON parsed; deploy depends on quality. Git Bash `bash -n
-deploy/deploy.sh` passed. The quality workflow contains Linux tests/builds and frontend audit; it
-has **not run in organization CI**. Nested workflows are inactive until this folder is a repository.
-
-Terraform init/validate/plan and ACA deployment were not executed: the private shared module/helper,
-state ownership and organization credentials require platform coordination. Reuse/import existing
-state or provision an isolated dev app; never apply fresh state over existing app/storage resources.
-The live smoke and read-only evaluation scripts are delivered but intentionally not executed.
-The ten seed evaluation cases are a starting point, not an SME-approved golden dataset.
-
-## E07 — Capture regression and legacy preservation
-
-From sibling `capture`, `.venv/Scripts/python.exe -m pytest`: **20 passed** (2.53 seconds), with the
-same upstream deprecation warning. Only Capture's `SPRINT.md` was changed for this Pascal task.
-The final legacy hash audit found 90 unchanged files outside `reworks`, zero additions and zero
-removals. Existing backend/MCP/security sources remain untouched.
-
-## Verification incidents and recovery
-
-Initial formatting configuration accidentally included the new virtualenv and uv hardlinked cached
-packages. It was corrected to `extend-exclude` plus explicit source/test/script targets. Only named,
-regenerable uv package-cache entries were cleared, and the locked environment was reinstalled with
-copy mode; both projects' final suites passed afterward. No user source was deleted. A concurrent
-Docker test-image export encountered a missing cache snapshot after tests passed; a sequential
-retry and subsequent offline test-image run succeeded. No broad Docker prune was performed.
-
-## Release decision
-
-Ready for engineering review and isolated dev integration, **not broad rollout**. The six release
-gates in `SPRINT.md` remain open for organization CI, actual JWT/Blob/MCP configuration, Diapason
-host/PDF interaction, real collectors, model-quality evaluation and legacy-risk acceptance. Shared
-revocation, distributed persistence, retention/CORS policy and attachment handles are explicitly
-owned future work, not silently changed in this core rework.
+The local refinement is ready for engineering review once the final workspace audit is green.
+It does not authorize broad rollout or resolve legacy revocation/CORS/distributed-storage risks.

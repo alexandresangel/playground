@@ -74,7 +74,6 @@ class ToolRegistry:
                     scope,
                     server.server_id,
                     server.server_url,
-                    server.protocol_version,
                     credential,
                 ]
             ).encode()

@@ -2,24 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 from pathlib import Path
 from typing import Any
 
-from capture.catalog import PromptCatalog
+from capture.adapters.catalog import PromptCatalog
+from capture.adapters.diapason import DiapasonClient
+from capture.adapters.model import CaptureModel
+from capture.auth import CaptureIdentity
 from capture.config import capture_config, float_setting, integer_setting
-from capture.diapason import DiapasonClient
-from capture.llm import AzureCaptureLlm
-from capture.security import CaptureIdentity
-from capture.workflow import CaptureLlm, CaptureWorkflow
-
-
-def public_result(result: dict[str, Any]) -> dict[str, Any]:
-    output = dict(result)
-    output.pop("session_artifacts", None)
-    output.pop("timings_ms", None)
-    return output
+from capture.workflow.graph import CaptureWorkflow
+from capture.workflow.ports import ExtractionModel
 
 
 class CaptureRuntime:
@@ -29,14 +24,19 @@ class CaptureRuntime:
         project_root: Path,
         *,
         catalog: PromptCatalog | None = None,
-        llm: CaptureLlm | None = None,
+        llm: ExtractionModel | None = None,
     ) -> None:
         self.config = config
         self.project_root = project_root
         self.capture_settings = capture_config(config)
         self.catalog = catalog or PromptCatalog(config, project_root)
-        self.llm = llm or AzureCaptureLlm(config)
-        self.workflow = CaptureWorkflow(self.catalog, self.llm)
+        self.llm = llm or (CaptureModel(config) if self.enabled else None)
+        self._owns_llm = llm is None
+        self.workflow = CaptureWorkflow(self.catalog, self.llm) if self.llm is not None else None
+
+    async def close(self) -> None:
+        if self._owns_llm and self.llm is not None:
+            await self.llm.close()
 
     @property
     def enabled(self) -> bool:
@@ -58,16 +58,24 @@ class CaptureRuntime:
         identity: CaptureIdentity,
         debug: bool = False,
     ) -> dict[str, Any]:
+        if not self.enabled or self.workflow is None:
+            raise ValueError("Capture is disabled")
         timeout = float_setting(self.capture_settings, "diapason_timeout_seconds", 120.0)
         diapason = DiapasonClient(identity.diapason, timeout_seconds=timeout)
-        return await self.workflow.run(
-            pdf_bytes=pdf_bytes,
-            trade_type=trade_type,
-            diapason=diapason,
-            max_pdf_bytes=self.max_pdf_bytes,
-            temperature=float_setting(self.capture_settings, "temperature", 0.5),
-            debug=debug,
-        )
+        try:
+            async with asyncio.timeout(
+                float_setting(self.capture_settings, "turn_timeout_seconds", 210)
+            ):
+                return await self.workflow.run(
+                    pdf_bytes=pdf_bytes,
+                    trade_type=trade_type,
+                    diapason=diapason,
+                    max_pdf_bytes=self.max_pdf_bytes,
+                    temperature=float_setting(self.capture_settings, "temperature", 0.5),
+                    debug=debug,
+                )
+        except TimeoutError as exc:
+            raise RuntimeError("Capture turn timed out") from exc
 
     def decode_pdf_base64(self, value: str) -> bytes:
         raw = (value or "").strip()

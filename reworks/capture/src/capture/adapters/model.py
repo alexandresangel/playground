@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from openai import AsyncAzureOpenAI
+import httpx
 
+from capture.adapters.azure_openai import AzureOpenAISettings, create_async_client
 from capture.config import azure_openai_config
 
 
-class AzureCaptureLlm:
-    def __init__(self, config: dict[str, Any]) -> None:
+class CaptureModel:
+    def __init__(
+        self, config: dict[str, Any], *, http_client: httpx.AsyncClient | None = None
+    ) -> None:
         block = azure_openai_config(config)
-        endpoint = str(block.get("endpoint") or "").strip()
-        api_key = str(block.get("api_key") or "").strip()
-        self.deployment = str(block.get("deployment") or "").strip()
-        api_version = str(block.get("api_version") or "2024-10-21").strip()
-        if not endpoint or not api_key or not self.deployment:
-            raise RuntimeError("Azure OpenAI endpoint, api_key, and deployment are required")
-        self._client = AsyncAzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=api_key,
-            api_version=api_version,
+        settings = AzureOpenAISettings.from_mapping(block)
+        self.deployment = settings.deployment
+        self._client = create_async_client(
+            settings,
+            timeout_seconds=float(block.get("timeout_seconds", 120)),
+            max_retries=int(block.get("max_retries", 2)),
+            http_client=http_client,
         )
+
+    async def close(self) -> None:
+        await self._client.close()
 
     async def extract(
         self, *, prompt: str, document_text: str, temperature: float

@@ -10,8 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "httpx>=0.28,<1",
   "pydantic>=2.10,<3", "python-multipart>=0.0.20,<1",
-  "langgraph>=1.0,<2", "langsmith>=0.7,<1", "openai>=1.68,<3", "tiktoken>=0.9,<1", "tzdata>=2025.1",
-  "jsonschema>=4.23,<5", "PyJWT>=2.10,<3", "cryptography>=44,<47",
+  "langgraph>=1.0,<2", "langsmith>=0.7,<1", "openai>=1.68,<3", "mcp>=1.26,<2", "tiktoken>=0.9,<1", "tzdata>=2025.1",
+  "jsonschema>=4.23,<5", "referencing>=0.36,<1", "PyJWT>=2.10,<3", "cryptography>=44,<47",
   "azure-storage-blob>=12.24,<13", "azure-identity>=1.19,<2",
   "opentelemetry-api>=1.30,<2", "opentelemetry-sdk>=1.30,<2",
   "opentelemetry-exporter-otlp-proto-http>=1.30,<2",
@@ -20,10 +20,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3,<9", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1", "mypy>=1.15,<2", "mcp>=1.26,<2", "python-hcl2>=7,<9"]
+dev = ["pytest>=8.3,<9", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1", "mypy>=1.15,<2", "python-hcl2>=7,<9"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["pascal*"]
 
 [tool.setuptools.package-data]
 pascal = ["i18n/locales/*.json"]
@@ -36,7 +37,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["src/pascal/security/jwt.py", "src/pascal/sessions/blob_store.py", "src/pascal/tools/sources.py", "src/pascal/tools/context.py", "src/pascal/i18n", "src/pascal/adapters/blob.py", "src/pascal/build_info.py", "src/pascal/security/deps.py", "src/pascal/security/setup.py", "src/pascal/tools/audience.py"]
+extend-exclude = ["src/pascal/security/jwt.py", "src/pascal/sessions/blob_store.py", "src/pascal/tools/sources.py", "src/pascal/tools/context.py", "src/pascal/i18n", "src/pascal/build_info.py", "src/pascal/security/deps.py", "src/pascal/security/setup.py", "src/pascal/tools/audience.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

@@ -79,3 +79,30 @@ def test_capture_proxy_keeps_wire_result_and_minimal_receipt(config, headers, au
         assert "<trade/>" not in json.dumps(record)
         assert "do not save" not in json.dumps(record)
         assert store.writes == 1
+        receipt = record["turns"][-1]["capture_receipt"]
+        assert receipt == {"operation": "capture", "trade_type": "loan", "success": True}
+        assert "skill_run" not in record["turns"][-1]
+
+
+def test_old_private_artifact_field_is_readable_but_not_exposed():
+    from pascal.sessions.blob_store import turns_for_client
+
+    old = {"role": "assistant", "content": "Imported", "skill_run": {"artifacts": "PRIVATE"}}
+    assert turns_for_client([old]) == [{"role": "assistant", "content": "Imported"}]
+    assert "skill_run" in old  # No destructive migration of stored records.
+
+
+def test_original_grafana_adjacent_field_regex_still_matches(identity):
+    import re
+
+    from pascal.compatibility import completion_prefix
+
+    fields = completion_prefix(identity, "session", {"input": 10, "output": 2}, None, "balance", "")
+    line = " ".join(f"{key}={json.dumps(value)}" for key, value in fields.items())
+    expression = (
+        r"customer=(?P<customer>\S+) user=(?P<user>\S+) session=(?P<session>\S+) "
+        r"tokens_in=(?P<tokens_in>\S*) tokens_out=(?P<tokens_out>\S*) "
+        r"cost_usd=(?P<cost_usd>\S*) tools=(?P<tools>\S*) skills=(?P<skills>\S*)"
+    )
+    match = re.search(expression, line)
+    assert match and match.group("customer") == str(identity.customer_id)

@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-from capture.catalog import PromptCatalog
-from capture.workflow import CaptureWorkflow
+from capture.adapters.catalog import PromptCatalog
+from capture.workflow.graph import CaptureWorkflow
 
 
 class FakeLlm:
@@ -44,7 +44,9 @@ async def test_graph_runs_unchanged_sequence(monkeypatch: pytest.MonkeyPatch) ->
     catalog = PromptCatalog({"capture": {"catalog_backend": "filesystem"}}, project_root)
     catalog.initialize()
     resolver = FakeResolver()
-    monkeypatch.setattr("capture.workflow.pdf_to_text", lambda _data: "extracted contract text")
+    monkeypatch.setattr(
+        "capture.workflow.nodes.pdf_to_text", lambda _data: "extracted contract text"
+    )
 
     result = await CaptureWorkflow(catalog, FakeLlm()).run(
         pdf_bytes=b"%PDF-test",

@@ -34,8 +34,10 @@ This path is user-controlled and should bypass model routing:
 3. Submit to the compatibility HTTP endpoint.
 4. Render the existing progress/receipt UI and send `dia-agent-open-trade` unchanged.
 
-The separate Pascal rework can rename the visible mention from `@intelligence-contract` to
-`@capture`; this service requires no such UX change.
+The separate pending Pascal rework already includes these command aliases in its existing composer.
+Its provenance documents those earlier frontend edits; this refinement leaves the UI frozen.
+Pascal's `api/capture_bridge.py` owns the same-origin request and minimal chat receipt, then forwards
+HTTP to this service. The original deployed agent has not been changed.
 
 ## 3. Pascal model-controlled MCP tool
 
@@ -50,8 +52,9 @@ Register server ID `capture` at `https://<capture-host>/mcp`. The agent must for
 - W3C `traceparent`/`tracestate`
 
 The current legacy agent supports static headers for extra MCP servers but does not forward these
-dynamic tenant headers. That is an explicit dependency for the future `reworks/diapason-agent` work;
-it is intentionally not patched here.
+dynamic tenant headers. The pending `reworks/diapason-agent` now supports explicit
+`forward_diapason_identity=true` on the trusted Capture binding. This does not change the original
+agent and must not be enabled on untrusted extra servers.
 
 The tool is named `capture` and has two required model arguments:
 
@@ -69,4 +72,3 @@ type or call until both required inputs exist. The service validates the decoded
 Base64 is the compatibility transport for Sprint 1. An opaque, authenticated attachment handle is the
 preferred later design because raw base64 increases payload size and should not be placed in the
 model’s conversational context.
-

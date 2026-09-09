@@ -102,4 +102,3 @@ Specific rules for this trade type to complete the input mask
   - Once the fields are filled in, we automatically trigger the action "Compute gross amount" (like if the user was clicking on the button "Compute gross amount" of the input mask.
     This action fills in the field "Gross amount"
 *************************************************************
-

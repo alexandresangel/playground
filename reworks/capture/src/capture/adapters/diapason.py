@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import logging
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
-from capture.security import DiapasonRequestContext
 
-log = logging.getLogger("capture.diapason")
+@dataclass(frozen=True)
+class DiapasonRequestContext:
+    base_url: str
+    scope: int
+    api_token: str = field(repr=False)
+    api_token_type: str = "Bearer"
+
+
+log = logging.getLogger("diapason.integrations.rest")
 
 
 def _local_tag(tag: str) -> str:
@@ -58,6 +66,8 @@ def parse_resolve_references_result(xml_text: str) -> dict[str, Any]:
     success = _text_child(basic, "success").lower() == "true"
     message = _text_child(basic, "message")
     warnings = [line.strip() for line in message.splitlines() if line.strip()]
+    if not success and message and message not in warnings:
+        warnings.insert(0, message)
     return {
         "success": success,
         "trade_xml": _unwrap_cdata(_text_child(basic, "extraInfo")).strip(),

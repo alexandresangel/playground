@@ -145,3 +145,29 @@ def test_cached_cost_and_unknown_prices():
     assert cost_usd(
         usage, {"input_usd_per_1m": 1, "cached_input_usd_per_1m": 0.5, "output_usd_per_1m": 2}
     ) == pytest.approx(0.00012)
+
+
+@pytest.mark.parametrize("keyword", ["$ref", "$dynamicRef", "$recursiveRef"])
+async def test_external_schema_references_never_dispatch(keyword, service_factory, identity):
+    transport = FakeMcp(
+        rows=[
+            {
+                "name": "balance",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"account": {keyword: "https://private.example/schema"}},
+                },
+            }
+        ]
+    )
+    model = FakeModel(
+        [
+            ModelReply(tool_calls=[ToolCall("one", "balance", '{"account":"A"}')]),
+            ModelReply(content="This tool schema is unsupported."),
+        ]
+    )
+    service = service_factory(model=model, transport=transport)
+    handle = await service.open(identity=identity, message="Balance")
+    await handle.task
+    assert not [request for request in transport.requests if request[1] == "tools/call"]
+    assert handle.outcome.traces[0]["error"]

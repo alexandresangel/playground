@@ -9,14 +9,22 @@ from jsonschema import Draft202012Validator
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
+from opentelemetry import trace
+from referencing import Registry
+from referencing.exceptions import NoSuchResource
 
 from pascal.agent.budget import BudgetExceeded, ContextBudget, cost_usd
 from pascal.agent.state import PascalState, TurnOutcome
 from pascal.config import AgentLimits
-from pascal.observability.events import operation, safe_arguments
+from pascal.observability.events import safe_arguments
+from pascal.observability.telemetry import operation, record_model_usage
 from pascal.ports import McpTransport, Model
 from pascal.tools.registry import BoundTool
 from pascal.tools.sources import extract_sources_from_tool_result, merge_source_lists
+
+
+def _no_schema_download(uri):
+    raise NoSuchResource(uri)
 
 
 @dataclass
@@ -83,6 +91,7 @@ async def model_node(state: PascalState, runtime: Runtime[GraphContext]) -> dict
             reply.usage["total"] = reply.usage["input"] + reply.usage["output"]
         for key, value in reply.usage.items():
             outcome.usage[key] = outcome.usage.get(key, 0) + value
+        record_model_usage(reply.usage)
         span.set_attribute("gen_ai.usage.input_tokens", reply.usage.get("input", 0))
         span.set_attribute("gen_ai.usage.output_tokens", reply.usage.get("output", 0))
     outcome.rounds += 1
@@ -143,18 +152,25 @@ async def tools_node(state: PascalState, runtime: Runtime[GraphContext]) -> dict
                 raise ValueError("invalid_tool_arguments")
             schema = tool.info["input_schema"]
             # External references are not resolved; never fetch schema URLs.
-            if '"$ref"' in json.dumps(schema):
+            if any(
+                key in json.dumps(schema) for key in ('"$ref"', '"$dynamicRef"', '"$recursiveRef"')
+            ):
 
                 def external_ref(node):
                     if isinstance(node, dict):
-                        if "$ref" in node and not str(node["$ref"]).startswith("#"):
+                        if any(
+                            key in node and not str(node[key]).startswith("#")
+                            for key in ("$ref", "$dynamicRef", "$recursiveRef")
+                        ):
                             return True
                         return any(external_ref(v) for v in node.values())
                     return isinstance(node, list) and any(external_ref(v) for v in node)
 
                 if external_ref(schema):
                     raise ValueError("unsupported_tool_schema")
-            Draft202012Validator(schema).validate(args)
+            Draft202012Validator(schema, registry=Registry(retrieve=_no_schema_download)).validate(
+                args
+            )
             writer({"type": "status", "content": f"Calling {call.name}…"})
             with operation("chat.tool") as span:
                 span.set_attribute("gen_ai.tool.name", tool.name)
@@ -170,6 +186,8 @@ async def tools_node(state: PascalState, runtime: Runtime[GraphContext]) -> dict
                     )
                 if result.get("isError"):
                     error = "tool_reported_error"
+                    span.set_status(trace.Status(trace.StatusCode.ERROR))
+                    span.set_attribute("error.type", "ToolReportedError")
                 span.set_attribute("tool.ok", error is None)
         except asyncio.CancelledError:
             entry["error"] = "tool_interrupted_result_unknown"

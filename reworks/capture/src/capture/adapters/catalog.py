@@ -9,9 +9,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from capture.blob_store import read_blob_text
+from capture.adapters.blob import read_blob_text
+from capture.compatibility import DEFAULT_CATALOG_BLOB, LEGACY_CATALOG_PREFIX
 from capture.config import capture_config, integer_setting, storage_config
-from capture.constants import DEFAULT_CATALOG_BLOB, LEGACY_CATALOG_PREFIX
 
 
 class PromptCatalog:

@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from capture.compatibility import capture_settings
+
 _CONFIG_ENV = "CAPTURE_CONFIG"
 _LEGACY_CONFIG_ENV = "CHAT_CONFIG"
 
@@ -40,11 +42,7 @@ def load_config(base_dir: Path | None = None) -> dict[str, Any]:
 
 
 def capture_config(config: dict[str, Any]) -> dict[str, Any]:
-    block = config.get("capture")
-    if isinstance(block, dict):
-        return block
-    legacy = config.get("intelligence_contract")
-    return legacy if isinstance(legacy, dict) else {}
+    return capture_settings(config)
 
 
 def storage_config(config: dict[str, Any]) -> dict[str, Any]:

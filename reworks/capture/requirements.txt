@@ -1,2 +1,2 @@
--e .
-
+# Compatibility installer; reproducible builds use uv.lock and uv sync --locked.
+-e .[mcp]

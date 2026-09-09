@@ -11,7 +11,7 @@
   "storage": {"account_name": "your-existing-storage", "chat_container": "chat-sessions", "config_container": "agent-config"},
   "azure_openai": {
     "endpoint": "https://your-resource.openai.azure.com", "api_key": "supply-from-secret-store",
-    "deployment": "your-existing-deployment", "api_version": "2024-10-21",
+    "deployment": "your-existing-deployment", "api_mode": "v1",
     "temperature": 0.2, "stream_usage": true, "max_tool_rounds": 4
   },
   "agent": {
@@ -31,7 +31,7 @@
     },
     "capture": {
       "label": "Capture", "server_url": "https://your-capture-aca/mcp", "enabled": false,
-      "protocol_version": "2025-03-26", "timeout_s": 210, "forward_diapason_identity": true
+      "timeout_s": 210, "forward_diapason_identity": true
     }
   },
   "capture": {"enabled": false, "base_url": "https://your-capture-aca", "timeout_s": 210, "max_pdf_bytes": 10485760},

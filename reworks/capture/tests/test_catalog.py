@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from capture.catalog import PromptCatalog
+from capture.adapters.catalog import PromptCatalog
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

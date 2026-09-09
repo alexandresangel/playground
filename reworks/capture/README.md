@@ -1,7 +1,7 @@
 # Capture
 
 `capture` is the standalone successor to the legacy “intelligence contract” code. It is a
-deterministic LangGraph workflow deployed as its own Azure Container App (ACA), with two protocol
+deterministic LangGraph workflow packaged for its own Azure Container App (ACA), with two protocol
 front doors over one implementation:
 
 - Classic Diapason and Pascal’s explicit `/capture` or `@capture` action use the compatibility HTTP
@@ -9,7 +9,9 @@ front doors over one implementation:
 - Pascal’s model can call the `capture` MCP tool at `/mcp` after the user has supplied an explicit
   `trade_type` and one PDF.
 
-No existing Diapason UX, agent, or backend files are changed by this rework.
+No original Diapason UX, agent, or backend files are changed. No cloud deployment has been performed.
+The separate Pascal rework has earlier integration-only frontend changes documented in its provenance;
+this refinement makes no frontend/static edits.
 
 ## What is preserved
 
@@ -39,22 +41,25 @@ checkpointer because its state contains contract text and XML.
 Requirements: Python 3.12, a compatible PKCS#12 key, and either Azure CLI access to the prompt blob
 container or the bundled filesystem catalog.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-cp config.example.json config.json
+```powershell
+uv sync --locked --extra dev --extra mcp
+uv run --locked --extra dev pytest
+uv run --locked --extra dev ruff check src tests scripts
 ```
 
 For local prompts, set `capture.catalog_backend` to `filesystem`. Then provide the keystore as
 `JWT_KEYSTORE_P12_B64` or `jwt_keystore.p12` and run:
 
 ```bash
-uvicorn capture.asgi:app --reload --port 8000
-pytest
+uv run uvicorn capture.main:create_app --factory --port 8000 --no-access-log
 ```
 
 Health endpoints are unauthenticated: `/health` is liveness and `/ready` confirms the catalog loaded.
+
+Use `config.example.json` as the shape for `CAPTURE_CONFIG` or ignored local `config.json`.
+Azure defaults to the local `AsyncOpenAI` v1 client; an older dated endpoint requires explicit
+`api_mode=azure_dated` and `api_version`. Set `mcp.enabled=false` for HTTP-only operation; the base
+package can be installed without the optional `mcp` extra. See [architecture](docs/architecture.md).
 
 ## HTTP contract
 
@@ -74,9 +79,10 @@ Required headers are `Authorization: Bearer <agent JWT>`, `X-Diapason-User-Id`,
 
 ## Deployment
 
-The deployment follows the legacy `diapason-agent`/`diapason-mcp` flow: shared `aca-lib.sh`, shared
+The prepared deployment artifacts follow the legacy `diapason-agent`/`diapason-mcp` flow: shared `aca-lib.sh`, shared
 ACA environment and registry, Terraform-managed app identity/RBAC, Infisical secrets, build-on-dev,
-and immutable image promotion to test/prod.
+and immutable image promotion to test/prod. Platform must approve state ownership, secrets/RBAC,
+actual probes/network settings and the private helper before executing the commands below.
 
 ```bash
 bash deploy/deploy-config.sh dev
@@ -88,6 +94,13 @@ bash deploy/deploy.sh test    # IMAGE_TAG=<tested dev SHA>
 has read-only access to the existing `agent-config` container. The deployment keeps at least one
 replica to avoid putting a PDF/LLM cold start on the synchronous UX path.
 
+## Source layout
+
+All Python implementation lives in `src/capture`: `workflow` contains extraction and orchestration,
+`adapters` owns external clients, `api` exposes HTTP/MCP, and `observability` owns telemetry/events.
+Small auth/config/compatibility modules stay at the root. Common files are intentionally duplicated
+inside Pascal at matching paths; see [reuse and maintenance](docs/reuse.md).
+
 ## Project documentation
 
 - [`SPRINT.md`](SPRINT.md) — user stories, acceptance criteria, tasks, risks, and decisions
@@ -97,4 +110,6 @@ replica to avoid putting a PDF/LLM cold start on the synchronous UX path.
 - [`docs/observability.md`](docs/observability.md) — Loki/Tempo settings and spans
 - [`docs/research.md`](docs/research.md) — legacy findings and current external guidance
 - [`docs/proposed-improvements.md`](docs/proposed-improvements.md) — deliberately unimplemented ideas
-
+- [`docs/provenance.md`](docs/provenance.md) — retained, refactored, added and removed code
+- [`docs/verification.md`](docs/verification.md) — current local evidence and external gates
+- [`docs/deployment.md`](docs/deployment.md) — locked image, platform prerequisites and safe rollout

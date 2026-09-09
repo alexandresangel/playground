@@ -16,6 +16,7 @@
     "view_entity": "loanDeposit",
     "temperature": 0.5,
     "diapason_timeout_seconds": 120,
+    "turn_timeout_seconds": 210,
     "allow_http_diapason": false,
     "allowed_diapason_hosts": []
   },
@@ -23,12 +24,14 @@
     "endpoint": "https://your-resource.openai.azure.com",
     "api_key": "",
     "deployment": "your-deployment-name",
-    "api_version": "2024-10-21"
+    "api_mode": "v1",
+    "timeout_seconds": 120,
+    "max_retries": 2
   },
   "mcp": {
+    "enabled": true,
     "resource_url": "https://capture.example.com",
     "allowed_hosts": ["capture.example.com", "capture.example.com:*"],
     "allowed_origins": []
   }
 }
-

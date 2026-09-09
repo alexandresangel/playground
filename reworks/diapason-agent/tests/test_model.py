@@ -1,7 +1,6 @@
 import json
 
 import httpx
-from openai import AsyncAzureOpenAI
 
 from pascal.adapters.model import AzureModel
 from pascal.config import AgentLimits
@@ -75,12 +74,9 @@ async def test_real_azure_sdk_stream_fragments_usage_and_options():
         "deployment": "test",
         "temperature": 0.1,
     }
-    adapter = AzureModel(config, AgentLimits())
-    await adapter.client.close()
-    adapter.client = AsyncAzureOpenAI(
-        azure_endpoint=config["endpoint"],
-        api_key="test",
-        api_version="2024-10-21",
+    adapter = AzureModel(
+        config,
+        AgentLimits(),
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(responder)),
     )
     deltas = []

@@ -23,31 +23,39 @@ env:
   GITHUB_REGISTRY: containers.diapason.ghe.com
 
 jobs:
+  quality:
+    uses: ./.github/workflows/ci.yml
   deploy:
+    needs: quality
     runs-on: [self-hosted, linux]
     environment: ${{ github.event_name == 'release' && 'prod' || inputs.environment }}
     steps:
       - name: Resolve target
         id: target
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_ENV: ${{ inputs.environment }}
+          PROMOTE_TAG: ${{ inputs.image_tag }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == release ]]; then
+          if [[ "$EVENT_NAME" == release ]]; then
             echo "env=prod" >>"$GITHUB_OUTPUT"
-            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "image_tag=$COMMIT_SHA" >>"$GITHUB_OUTPUT"
             echo "skip_build=1" >>"$GITHUB_OUTPUT"
-            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.environment }}" == test ]]; then
-            [[ -n "${{ inputs.image_tag }}" ]] || { echo "image_tag is required for test" >&2; exit 1; }
+            echo "checkout_ref=$COMMIT_SHA" >>"$GITHUB_OUTPUT"
+          elif [[ "$TARGET_ENV" == test ]]; then
+            [[ "$PROMOTE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "image_tag must be a tested commit SHA" >&2; exit 1; }
             echo "env=test" >>"$GITHUB_OUTPUT"
-            echo "image_tag=${{ inputs.image_tag }}" >>"$GITHUB_OUTPUT"
+            echo "image_tag=$PROMOTE_TAG" >>"$GITHUB_OUTPUT"
             echo "skip_build=1" >>"$GITHUB_OUTPUT"
-            echo "checkout_ref=${{ inputs.image_tag }}" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=$PROMOTE_TAG" >>"$GITHUB_OUTPUT"
           else
             echo "env=dev" >>"$GITHUB_OUTPUT"
-            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "image_tag=$COMMIT_SHA" >>"$GITHUB_OUTPUT"
             echo "skip_build=0" >>"$GITHUB_OUTPUT"
-            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=$COMMIT_SHA" >>"$GITHUB_OUTPUT"
           fi
       - uses: actions/checkout@v7
         with:
@@ -72,4 +80,3 @@ jobs:
         run: bash deploy/deploy.sh "${{ steps.target.outputs.env }}"
       - uses: diapason/actions/service-deploy/logout-azure@main
         if: always()
-

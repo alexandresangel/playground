@@ -5,14 +5,15 @@ from pathlib import Path
 import httpx
 from conftest import FakeMcp, FakeModel, MemoryStore
 from fastapi.testclient import TestClient
+from mcp_fixtures import initialization_response
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from pascal.adapters.mcp import HttpMcpTransport
 from pascal.main import create_app
-from pascal.observability import events
-from pascal.observability.bootstrap import _headers, _resource, instrument_app
+from pascal.mcp.host import McpHost
+from pascal.observability import telemetry
+from pascal.observability.telemetry import _headers, _resource, instrument_app
 from pascal.tools.context import McpServerContext
 
 
@@ -41,7 +42,7 @@ async def test_model_error_has_no_secret_in_trace_or_log(
 ):
     provider, exporter = TracerProvider(), InMemorySpanExporter()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr(events, "tracer", provider.get_tracer("test"))
+    monkeypatch.setattr(telemetry, "_tracer", provider.get_tracer("test"))
     caplog.set_level(logging.INFO, logger="diapason.chat")
     service = service_factory(model=FakeModel([RuntimeError("SECRET_REMOTE_RESPONSE")]))
     handle = await service.open(identity=identity, message="PRIVATE USER QUESTION")
@@ -74,7 +75,7 @@ def test_ingress_trace_parent_and_ambient_header_capture_are_safe(
 ):
     provider, exporter = TracerProvider(), InMemorySpanExporter()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr(events, "tracer", provider.get_tracer("test"))
+    monkeypatch.setattr(telemetry, "_tracer", provider.get_tracer("test"))
     monkeypatch.setenv("OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST", ".*")
     monkeypatch.setattr(
         "pascal.main.instrument_app", lambda app: instrument_app(app, tracer_provider=provider)
@@ -114,19 +115,22 @@ def test_ingress_trace_parent_and_ambient_header_capture_are_safe(
 async def test_w3c_context_reaches_mcp_without_credentials_in_span(monkeypatch):
     provider, exporter = TracerProvider(), InMemorySpanExporter()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr(events, "tracer", provider.get_tracer("test"))
+    monkeypatch.setattr(telemetry, "_tracer", provider.get_tracer("test"))
     received = []
 
     async def responder(request):
         received.append(request.headers)
+        initialization = initialization_response(request)
+        if initialization is not None:
+            return initialization
         rpc = json.loads(request.content)
         return httpx.Response(
             200, json={"jsonrpc": "2.0", "id": rpc["id"], "result": {"tools": []}}
         )
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(responder))
-    adapter = HttpMcpTransport({}, 4096, client)
-    with events.operation("chat.tool") as span:
+    client = httpx.MockTransport(responder)
+    adapter = McpHost({}, 4096, client)
+    with telemetry.operation("chat.tool") as span:
         await adapter.request(
             McpServerContext("default", "D", "https://mcp/mcp", {"Authorization": "Bearer secret"}),
             "tools/list",

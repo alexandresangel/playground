@@ -10,9 +10,10 @@ from opentelemetry.propagate import inject
 from pascal.agent.service import BusyError
 from pascal.agent.state import ExternalFailure, ExternalResult
 from pascal.api.chat import SESSION_HEADER
+from pascal.compatibility import CAPTURE_HTTP_PATH
 from pascal.i18n import locale_from_header_value, translate
 
-PATH = "/api/skills/intelligence-contract"
+PATH = CAPTURE_HTTP_PATH
 FORWARD_HEADERS = (
     "Authorization",
     "X-Diapason-User-Id",
@@ -118,7 +119,7 @@ def router(deps: dict) -> APIRouter:
                 result,
                 answer,
                 {
-                    "skill": "capture",
+                    "operation": "capture",
                     "trade_type": trade_type,
                     "success": bool(result.get("success")),
                 },
@@ -129,7 +130,7 @@ def router(deps: dict) -> APIRouter:
             handle = await request.app.state.chat.open(
                 identity=identity,
                 session_id=session_id or request.headers.get(SESSION_HEADER),
-                message=f"@intelligence-contract import {trade_type} from {filename}",
+                message=f"Capture import {trade_type} from {filename}",
                 locale=locale,
                 external=execute,
             )

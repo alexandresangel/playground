@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from pascal.compatibility import strip_private_receipts
+
 # --- helpers ---
 
 
@@ -120,29 +122,16 @@ def _normalize_sources(sources: Optional[List[Any]]) -> List[Dict[str, str]]:
     return out
 
 
-def _normalize_skill_run(skill_run: Optional[Any]) -> Optional[Dict[str, Any]]:
-    if not isinstance(skill_run, dict):
+def _normalize_capture_receipt(receipt: Any) -> dict | None:
+    if not isinstance(receipt, dict):
         return None
-    skill = skill_run.get("skill")
-    if not isinstance(skill, str) or not skill.strip():
+    if receipt.get("operation") != "capture" or not isinstance(receipt.get("success"), bool):
         return None
-    out: Dict[str, Any] = {"skill": skill.strip()}
-    for key in ("trade_type", "view_entity", "menu_name", "pdf_filename"):
-        val = skill_run.get(key)
-        if isinstance(val, str) and val.strip():
-            out[key] = val.strip()
-    if isinstance(skill_run.get("success"), bool):
-        out["success"] = skill_run["success"]
-    warnings = skill_run.get("warnings")
-    if isinstance(warnings, list):
-        out["warnings"] = [str(w) for w in warnings if w]
-    artifacts = skill_run.get("artifacts")
-    if isinstance(artifacts, dict) and artifacts:
-        out["artifacts"] = artifacts
-    timings = skill_run.get("timings_ms")
-    if isinstance(timings, dict) and timings:
-        out["timings_ms"] = timings
-    return out
+    return {
+        "operation": "capture",
+        "trade_type": str(receipt.get("trade_type") or ""),
+        "success": receipt["success"],
+    }
 
 
 def _normalize_usage(usage: Optional[Any]) -> Optional[Dict[str, Any]]:
@@ -166,9 +155,7 @@ def turns_for_client(turns: Any) -> List[Dict[str, Any]]:
     for turn in turns:
         if not isinstance(turn, dict):
             continue
-        cleaned = dict(turn)
-        cleaned.pop("skill_run", None)
-        out.append(cleaned)
+        out.append(strip_private_receipts(turn))
     return out
 
 
@@ -179,7 +166,7 @@ def _add_turns(
     max_turns: int,
     tool_trace: Optional[List[Any]] = None,
     sources: Optional[List[Any]] = None,
-    skill_run: Optional[Any] = None,
+    capture_receipt: Optional[Any] = None,
     usage: Optional[Any] = None,
 ) -> None:
     turns = record.setdefault("turns", [])
@@ -194,9 +181,9 @@ def _add_turns(
     normalized_sources = _normalize_sources(sources)
     if normalized_sources:
         assistant_turn["sources"] = normalized_sources
-    normalized_skill_run = _normalize_skill_run(skill_run)
-    if normalized_skill_run:
-        assistant_turn["skill_run"] = normalized_skill_run
+    normalized_capture_receipt = _normalize_capture_receipt(capture_receipt)
+    if normalized_capture_receipt:
+        assistant_turn["capture_receipt"] = normalized_capture_receipt
     normalized_usage = _normalize_usage(usage)
     if normalized_usage:
         assistant_turn["usage"] = normalized_usage
@@ -379,7 +366,7 @@ class BlobSessionStore:
         assistant: str,
         tool_trace: Optional[List[Any]] = None,
         sources: Optional[List[Any]] = None,
-        skill_run: Optional[Any] = None,
+        capture_receipt: Optional[Any] = None,
         usage: Optional[Any] = None,
     ) -> None:
         key = _session_key(scope, session_id)
@@ -393,7 +380,7 @@ class BlobSessionStore:
                 self._max_turns,
                 tool_trace=tool_trace,
                 sources=sources,
-                skill_run=skill_run,
+                capture_receipt=capture_receipt,
                 usage=usage,
             )
             return record

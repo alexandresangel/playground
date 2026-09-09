@@ -6,7 +6,7 @@ import base64
 import json
 import threading
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -16,8 +16,8 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
-from capture.config import capture_config
-from capture.constants import (
+from capture.adapters.diapason import DiapasonRequestContext
+from capture.compatibility import (
     CUSTOMER_ID_HEADER,
     DIAPASON_API_TOKEN_HEADER,
     DIAPASON_BASE_URL_HEADER,
@@ -28,6 +28,7 @@ from capture.constants import (
     JWT_REVOCATION_PATH,
     USER_ID_HEADER,
 )
+from capture.config import capture_config
 
 
 class TokenValidationError(Exception):
@@ -91,14 +92,6 @@ class JwtAuth:
         if not set(roles) & {str(role) for role in token_roles}:
             raise TokenValidationError("Insufficient role")
         return claims
-
-
-@dataclass(frozen=True)
-class DiapasonRequestContext:
-    base_url: str
-    scope: int
-    api_token: str = field(repr=False)
-    api_token_type: str = "Bearer"
 
 
 @dataclass(frozen=True)

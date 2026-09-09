@@ -12,14 +12,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from pascal.adapters.mcp import HttpMcpTransport
 from pascal.adapters.model import AzureModel
 from pascal.agent.prompt import PromptProvider
 from pascal.agent.service import ChatService
-from pascal.api import capture, chat, sessions, system
+from pascal.api import capture_bridge, chat, sessions, system
 from pascal.api.guards import RequestGuards
 from pascal.config import limits_from_config, load_config
-from pascal.observability.bootstrap import flush_otel, init_otel, instrument_app
+from pascal.mcp.host import McpHost
+from pascal.observability.telemetry import flush_otel, init_otel, instrument_app
 from pascal.security.deps import jwt_deps
 from pascal.security.setup import build_jwt_auth
 from pascal.sessions.blob_store import create_session_store
@@ -53,7 +53,7 @@ def create_app(
         app.state.store = store or await asyncio.to_thread(create_session_store, cfg)
         app.state.prompts = await asyncio.to_thread(PromptProvider, cfg, project_root, prompt_text)
         app.state.model = model or AzureModel(cfg["azure_openai"], limits)
-        app.state.transport = transport or HttpMcpTransport(
+        app.state.transport = transport or McpHost(
             cfg.get("mcp", {}), limits.max_mcp_response_bytes
         )
         app.state.capture_client = capture_client or httpx.AsyncClient(follow_redirects=False)
@@ -101,7 +101,7 @@ def create_app(
     app.include_router(chat.router(deps))
     app.include_router(sessions.router(deps))
     app.include_router(system.router(deps))
-    app.include_router(capture.router(deps))
+    app.include_router(capture_bridge.router(deps))
     app.add_middleware(
         RequestGuards,
         max_body_bytes=int(cfg.get("capture", {}).get("max_pdf_bytes", 10485760)) + 65536,

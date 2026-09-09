@@ -4,8 +4,12 @@ import httpx
 import pytest
 import respx
 
-from capture.diapason import DiapasonClient, parse_resolve_references_result, wrap_trade_xml
-from capture.security import DiapasonRequestContext
+from capture.adapters.diapason import (
+    DiapasonClient,
+    parse_resolve_references_result,
+    wrap_trade_xml,
+)
+from capture.auth import DiapasonRequestContext
 
 
 def test_wrap_trade_xml() -> None:

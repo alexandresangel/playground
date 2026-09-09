@@ -4,6 +4,12 @@ Reference: `../../../docs/01-issues-and-risks.md` in the original repository. Th
 core changes from external redesign; implementation claims must
 be read with the verification status of the associated task in `../SPRINT.md`.
 
+The PAS-T identifiers below are historical references from the first rework. The revised board uses
+PAS-M01–M06 (migration), PAS-D01–D05 (deployment/integration) and PAS-V01–V03 (later validation).
+Architecture/lifecycle findings map to M01/M02/M05; model/MCP/budgets to M02/M03/M05; compatibility,
+storage and Capture to M04; prompts/documentation to M02/M06; telemetry to D05; packaging to D01/D02.
+Future-work and release-gate IDs remain active. Current evidence is in docs/verification.md.
+
 | Issues | Treatment in this rework | Task / remaining ownership |
 |---|---|---|
 | A1, A2, A3 | Package boundaries and one explicit graph/service for both chat modes | PAS-T001/T002 |

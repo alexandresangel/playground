@@ -5,12 +5,14 @@ import time
 from dataclasses import dataclass, field
 
 from langsmith import tracing_context
+from opentelemetry.trace import Status, StatusCode
 
 from pascal.agent.budget import BudgetExceeded, ContextBudget, cost_usd
 from pascal.agent.graph import GraphContext, build_graph
 from pascal.agent.state import ExternalFailure, TurnOutcome
 from pascal.config import AgentLimits
-from pascal.observability.events import completion, log, operation
+from pascal.observability.events import completion, log
+from pascal.observability.telemetry import operation
 from pascal.tools.routing import route
 
 MODE = "mcp-http+azure-tool-calling"
@@ -246,7 +248,7 @@ class ChatService:
                                 outcome.usage, self.config.get("azure_openai", {})
                             ),
                         },
-                        skill_run=outcome.receipt,
+                        capture_receipt=outcome.receipt,
                     ),
                     name="pascal-persist",
                 )
@@ -263,6 +265,9 @@ class ChatService:
                     self.active.pop((identity.scope_path, handle.session_id), None)
                 span.set_attribute("chat.status", outcome.status)
                 span.set_attribute("chat.persisted", outcome.persisted)
+                if outcome.status != "completed":
+                    span.set_status(Status(StatusCode.ERROR))
+                    span.set_attribute("error.type", outcome.status)
                 completion(
                     identity,
                     handle.session_id,

@@ -2,21 +2,23 @@
 
 from collections.abc import Awaitable, Callable
 
-from openai import AsyncAzureOpenAI
+import httpx
 
+from pascal.adapters.azure_openai import AzureOpenAISettings, create_async_client
 from pascal.agent.state import ModelReply, ToolCall
 from pascal.config import AgentLimits
 
 
 class AzureModel:
-    def __init__(self, config: dict, limits: AgentLimits):
+    def __init__(
+        self, config: dict, limits: AgentLimits, *, http_client: httpx.AsyncClient | None = None
+    ):
         self.config = config
-        self.client = AsyncAzureOpenAI(
-            azure_endpoint=config["endpoint"],
-            api_key=config["api_key"],
-            api_version=config.get("api_version", "2024-10-21"),
-            timeout=limits.model_timeout_seconds,
+        self.client = create_async_client(
+            AzureOpenAISettings.from_mapping(config),
+            timeout_seconds=limits.model_timeout_seconds,
             max_retries=limits.model_retries,
+            http_client=http_client,
         )
 
     async def complete(

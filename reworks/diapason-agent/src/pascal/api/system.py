@@ -7,6 +7,7 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
 
 from pascal import build_info
+from pascal.compatibility import capture_health_fields
 from pascal.i18n import DEFAULT_LOCALE, locale_from_header_value, strings_for_locale
 from pascal.security.jwt import TokenValidationError
 
@@ -67,8 +68,8 @@ def router(deps: dict) -> APIRouter:
             sessions_backend=state.store.backend,
             prompt_source=state.prompts.snapshot.source,
             prompt_length=len(state.prompts.snapshot.text),
-            intelligence_contract_enabled=bool(state.config.get("capture", {}).get("enabled")),
         )
+        payload.update(capture_health_fields(bool(state.config.get("capture", {}).get("enabled"))))
         if credentials:
             try:
                 claims = state.auth.validate(credentials.credentials)

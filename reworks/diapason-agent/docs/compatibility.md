@@ -38,5 +38,7 @@ come only from the request/config adapters, never model arguments.
 
 Blob's existing usage normalizer still persists input/output/total tokens and cost. Optional
 cached/estimated usage details are available on the current response and telemetry, not a new historic
-record schema. The added optional tool-trace `error` contains a short allowlisted-format code, never
+required record schema. New composer turns add optional minimal `capture_receipt` metadata; old
+private `skill_run` records remain readable and are filtered at the public boundary without backfill.
+The added optional tool-trace `error` contains a short allowlisted-format code, never
 an exception body; older records without it remain readable.

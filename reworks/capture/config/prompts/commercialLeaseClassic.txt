@@ -60,4 +60,3 @@ Specific rules for this trade type to complete the input mask
   - Check box "Fixed" will be forced to TRUE
 
 *************************************************************
-

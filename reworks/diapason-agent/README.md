@@ -39,11 +39,21 @@ No credential should be put into a URL or committed to the repository.
 ## Boundaries
 
 - `src/pascal/agent`: state, graph, prompt snapshot, context/cost limits, turn lifecycle.
-- `src/pascal/adapters`: async Azure model and stateless MCP HTTP, existing Blob connection logic.
+- `src/pascal/adapters`: model message/stream adapter using the local Azure client.
+- `src/pascal/mcp`: host-owned HTTP pool and server-scoped official SDK clients.
+- Local common primitives use matching paths in both apps; see [intentional duplication](docs/reuse.md).
 - `src/pascal/tools`: tenant-scoped catalogue, deterministic routing, audience and source adapters.
 - `src/pascal/security`, `sessions`: preserved JWT/Fernet and Blob boundary behavior.
 - `src/pascal/api`: compatible chat/session/system routes and the Capture composer proxy.
 - `src/pascal/observability`: existing Loki/Tempo OTLP configuration and content-free events.
+- `src/pascal/compatibility.py`: unavoidable old wire/storage/dashboard aliases only.
+
+Azure defaults to `AsyncOpenAI` against `/openai/v1/`; an approved older deployment must explicitly
+select `api_mode=azure_dated` with `api_version`. Chat Completions behavior remains in the model
+adapter. MCP uses SDK initialization/negotiation, not a manual stateless JSON-RPC implementation.
+See [MCP decisions](docs/mcp.md), [core review](docs/core-review.md),
+[provenance and earlier frontend changes](docs/provenance.md), and
+[moderation design only](docs/moderation-design.md).
 
 `/health` is process liveness; `/ready` means startup completed, not that every external dependency is
 reachable. Session/auth administration endpoints and `/api/chat`, `/api/chat/stream`, `/api/mcp/tools`

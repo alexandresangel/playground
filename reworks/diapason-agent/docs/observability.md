@@ -1,68 +1,92 @@
-# Loki / Tempo operations
+# Pascal observability
 
-Pascal continues to export OTLP over HTTP to the existing collectors. No LangSmith account or second
-telemetry backend is required. Application spans and logs omit prompts, queries, tool arguments and
-results, PDFs, XML and request credentials. The logger records only exception class names, never raw
-remote exception messages. The shared graph explicitly disables LangSmith tracing for this reason.
+Both applications keep an identical local `observability/telemetry.py` module inside their own
+package (see [intentional duplication](reuse.md)): OTLP/HTTP protobuf,
+batch logs/spans, periodic metrics and lifespan flush. No LangSmith account or new cloud service is
+required. The explicit compatibility mode preserves the existing Loki/Tempo environment contract.
 
-## Environment contract
+## Routing contract
 
-| Variable | Behavior |
+| Configuration | Behavior |
 |---|---|
-| OTEL_SERVICE_NAME | Set by existing deploy helper, normally `diapason-agent-{environment}`; local fallback `diapason_agent` |
-| OTEL_EXPORTER_OTLP_TRACES_ENDPOINT | Full trace signal URL, passed as-is to the HTTP exporter |
-| OTEL_EXPORTER_OTLP_LOGS_ENDPOINT | Full Loki/collector log signal URL, often ending `/otlp/v1/logs` |
-| OTEL_EXPORTER_OTLP_ENDPOINT | Existing generic full-signal fallback; not automatically suffixed |
-| OTEL_EXPORTER_OTLP_PROTOCOL | Required for generic logs fallback, as in legacy deployment |
-| OTEL_EXPORTER_OTLP_HEADERS | Comma-separated headers; URL-decoded values |
-| OTEL_EXPORTER_OTLP_TRACES_HEADERS / LOGS_HEADERS | Signal-specific headers override generic headers |
-| OTEL_EXPORTER_OTLP_TOKEN | Used as Bearer authorization when explicit headers are absent |
-| OTEL_EXPORTER_OTLP_SCOPE_ORG_ID | Loki tenant; `mcc` fallback for logs. Applied to traces when explicitly set |
-| OTEL_RESOURCE_ATTRIBUTES | Existing service/environment labels; do not include customer data |
+| OTEL_SERVICE_NAME / OTEL_RESOURCE_ATTRIBUTES | Service/environment resource attributes; keep current deployment naming |
+| OTEL_EXPORTER_OTLP_TRACES_ENDPOINT | Full trace URL, passed as-is |
+| OTEL_EXPORTER_OTLP_LOGS_ENDPOINT | Full log URL, passed as-is; often Loki /otlp/v1/logs |
+| OTEL_EXPORTER_OTLP_METRICS_ENDPOINT | Explicit full metrics receiver URL; the only way to enable metrics export |
+| DIAPASON_OTLP_ENDPOINT_MODE=legacy_full_signal | Default: generic OTLP_ENDPOINT is the old full-signal fallback; generic logs also require PROTOCOL |
+| DIAPASON_OTLP_ENDPOINT_MODE=standard | Generic base URL gains /v1/traces or /v1/logs; explicit signal URLs still win |
+| OTEL_EXPORTER_OTLP_PROTOCOL / signal-specific *_PROTOCOL | Only http/protobuf supported by these exporters |
+| OTEL_EXPORTER_OTLP_HEADERS / signal-specific *_HEADERS | URL-decoded headers; a nonempty signal-specific set replaces the generic set |
+| OTEL_EXPORTER_OTLP_TOKEN | Legacy Bearer fallback when no explicit headers exist |
+| OTEL_EXPORTER_OTLP_SCOPE_ORG_ID | Legacy token fallback adds explicit tenant to all signals; logs default to mcc only |
 
-Supply the **same endpoint values** used by the deployed legacy agent. The generic URL behavior is
-intentionally compatible rather than silently reinterpreting it as an OTLP base URL. Exporters batch
-and flush at lifespan exit; provider shutdown also runs at process exit. Health probes do not call
-Azure/MCP/Blob, avoiding probe storms during a dependency outage.
+For an unchanged deployment, keep its exact signal URLs. For a new collector, prefer explicit signal
+URLs or consciously select standard mode. Do not silently reinterpret an existing generic URL.
+The compatibility mode is intentionally not the standard base-URL default.
+[OTLP endpoint specification](https://opentelemetry.io/docs/specs/otel/protocol/exporter/).
 
-## Trace and log correlation
+Loki stores logs; Tempo stores traces. Neither existing signal URL should be assumed to store metrics.
+Have SRE supply a metrics-capable OTLP collector/backend (for example a collector feeding the approved
+Prometheus/Mimir platform); provision it in the platform repository, not implicitly in this app.
+Metrics stay disabled until the explicit metrics endpoint is set. No backend/dashboard was deployed.
 
-FastAPI instrumentation extracts W3C `traceparent`. `chat.completion` owns `chat.model` per round and
-`chat.tool` per actual tool call. The explicit MCP/Capture adapters inject the active W3C context into
-downstream requests without logging headers. Tools failing locally validation do not create a fake
-remote-call span. There is no blanket HTTP client instrumentation that would capture credential-bearing
-URLs from arbitrary tool configuration.
+## Metrics
 
-The `chat done` log keeps customer/user/instance/session, tokens_in/tokens_out, cost_usd, tools, skills
-and blob fields. Added fields include trace_id/span_id, status, persisted, rounds, ttft_ms, duration_ms,
-cached_tokens and prompt_version. Session IDs and tenant IDs are log fields/span attributes, not metric
-labels. Query preview is removed. Costs are null without configured Azure prices; token estimates are
-not billing records. Existing dashboards that depended on query_preview must remove that column.
+| Instrument | Type/unit | Labels |
+|---|---|---|
+| diapason.operation.count | Counter / operations | fixed operation name, success/error/cancelled |
+| diapason.operation.duration | Histogram / seconds | same |
+| diapason.turn.count | Counter / turns (Pascal) | allowlisted terminal status |
+| diapason.chat.time_to_first_token | Histogram / seconds (Pascal) | none |
+| diapason.model.token.usage | Counter / tokens | input/output, estimated true/false |
 
-## Proposed SLO/alert starting point (requires SRE approval)
+These are application metrics, not claims to implement a complete stable GenAI semantic convention.
+Azure-reported usage is recorded per response; estimates are marked. Completion metrics count business
+status, not just HTTP 200 (an SSE turn may fail after headers). Operation status also works when spans
+are unsampled or tracing export is disabled. Use SDK/backend histogram buckets and aggregation that
+match measured traffic before adopting SLOs. OTel FastAPI instrumentation may emit its own HTTP
+metrics as well; inspect the pinned SDK's names and cardinality in the actual collector.
 
-Measure for a week in dev/test, then agree thresholds with product; do not call these adopted SLOs.
+No customer, user, session, tool arguments, PDF, trade_type or prompt is an application metric label.
+Do not insert those into resource attributes either. Resource labels should be service/version/
+environment, not unbounded tenant dimensions.
+[Python exporter guidance](https://opentelemetry.io/docs/languages/python/exporters/).
 
-- Availability: fraction of accepted turns with `status=completed` and `persisted=true`. Track
-  cancelled user turns separately; count dependency failures, not just HTTP 5xx (SSE already has 200).
-- Latency: p50/p95 first token and completed-turn duration, split by tool family/environment, not user.
-- Reliability: any `persistence_failed` should alert promptly; rising model/tool failure ratios should
-  page only with sustained traffic and an agreed burn-rate policy.
-- Resource: turns reaching limits, cache/discovery failures, process memory and replica saturation.
-- Capture: end-to-end p95 approaching the ingress budget requires the Capture job design discussion.
+## Privacy and correlation scope
 
-Example Loki exploration (adapt label mapping to the current collector):
+FastAPI extracts incoming W3C context. Explicit downstream adapters inject it. Application operation
+spans disable automatic exception recording/status descriptions and record only error class/code.
+Application log export is restricted to capture./diapason./pascal. operational loggers. No blanket
+HTTPX or model instrumentation captures arbitrary downstream URLs or payloads. Inbound header
+capture is explicitly disabled/sanitized, even if ambient OTel header settings exist. Graph execution
+disables ambient LangSmith content tracing.
 
-```logql
-{service_name="diapason-agent-dev"} |= "chat done" | logfmt | status="persistence_failed"
-{service_name="diapason-agent-dev"} |= "chat done" | logfmt | trace_id="<trace id>"
-```
+This is a controlled application telemetry policy, not universal DLP. FastAPI's HTTP instrumentation
+still describes requests; never put tokens or contract data in URLs/query parameters. Upstream proxy
+logs, third-party console logs, newly added logger calls and collector transforms require their own
+review. Debug HTTP results and stored chat transcripts are not telemetry and retain separate policies.
 
-For a persistence failure: locate the trace, check scoped Blob RBAC/reachability, avoid blind user
-retries if a tool may have mutated data, and recover the receipt from approved operational evidence.
-For an MCP failure: identify the server/tool span, verify its current protocol/auth/config without
-printing tokens, check the server's trace, and retry only with an understood idempotency policy.
+Both suites run `scripts/telemetry_check.py` in an isolated process against a real loopback OTLP
+collector. Tests decode protobuf logs, spans and metrics, check signal paths/auth/tenant headers,
+trace/log correlation, expected token values, label boundaries and absence of fixture secrets.
+They do not establish the actual corporate collector's routing or retention. Release gate R004 must
+inspect one real trace/log pair and the approved metrics backend before rollout.
 
-Release check PAS-R004: exercise one real turn through Diapason MCP and Capture, open the same trace
-in Tempo, find its completion log in Loki, inspect exporter auth/tenant routing, and verify no content
-or credentials appear. Local exporter/trace assertions are necessary but do not replace this gate.
+## Existing Grafana compatibility
+
+The completion serializer retains the original ordered adjacent prefix:
+`customer user session tokens_in tokens_out cost_usd tools skills`.
+The literal `skills` log field is an external dashboard alias only; application logic has no such
+feature. This order matters: the original dashboard generator uses a regex, not arbitrary logfmt
+field ordering. A regression test matches the original ordering.
+
+New fields follow that prefix: instance, cached tokens, Blob/backend, terminal status, persisted,
+duration, rounds, first-token time, prompt version and trace/span IDs. Query previews are removed.
+Dashboard panels requiring query_preview must stop relying on content capture. IDs remain in
+access-controlled logs/spans for compatibility, never in metric labels.
+
+`chat.completion` owns model/tool child spans. Local validation failures do not create fake remote
+tool calls. Sanitized failed/partial status is visible even if the route returned SSE HTTP 200.
+Suggested measures: completed-and-persisted turn fraction, cancellation separately, first-token and
+turn p95, model/tool failures, budget exhaustion and any persistence failure. SRE must choose
+thresholds and runbooks from dev traffic before creating alerts.

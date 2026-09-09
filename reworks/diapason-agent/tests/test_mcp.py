@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 from dataclasses import replace
 
@@ -6,10 +7,12 @@ import httpx
 import pytest
 from conftest import FakeMcp
 from cryptography.fernet import Fernet
+from mcp_fixtures import initialization_response
 from starlette.requests import Request
 
-from pascal.adapters.mcp import HttpMcpTransport, McpFailure
 from pascal.config import AgentLimits
+from pascal.mcp.host import McpHost
+from pascal.mcp.transport import McpFailure
 from pascal.tools.context import McpCluster, McpServerContext, mcp_from_request
 from pascal.tools.registry import ToolRegistry
 from pascal.tools.routing import RouteError, route
@@ -132,6 +135,9 @@ async def test_json_and_sse_transport_no_cookie_leak(sse):
 
     async def responder(request):
         seen.append(request)
+        initialization = initialization_response(request)
+        if initialization is not None:
+            return initialization
         body = json.loads(request.content)
         result = {"jsonrpc": "2.0", "id": body["id"], "result": {"tools": []}}
         headers = {"set-cookie": "session=must-not-leak; Path=/"}
@@ -143,8 +149,8 @@ async def test_json_and_sse_transport_no_cookie_leak(sse):
             )
         return httpx.Response(200, json=result, headers=headers)
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(responder))
-    adapter = HttpMcpTransport({}, 2048, client)
+    client = httpx.MockTransport(responder)
+    adapter = McpHost({}, 2048, client)
     server = McpServerContext(
         "default", "Diapason", "https://mcp.example/mcp", {"Authorization": "Bearer A"}
     )
@@ -152,16 +158,25 @@ async def test_json_and_sse_transport_no_cookie_leak(sse):
     await adapter.request(
         replace(server, request_headers={"Authorization": "Bearer B"}), "tools/list", {}
     )
-    assert seen[0].headers["authorization"] == "Bearer A"
-    assert seen[1].headers["authorization"] == "Bearer B"
-    assert "cookie" not in seen[1].headers
-    assert seen[0].headers["MCP-Protocol-Version"] == "2024-11-05"
+    calls = [
+        r for r in seen if r.method == "POST" and json.loads(r.content)["method"] == "tools/list"
+    ]
+    assert [r.headers["authorization"] for r in calls] == ["Bearer A", "Bearer B"]
+    initializations = [
+        r for r in seen if r.method == "POST" and json.loads(r.content)["method"] == "initialize"
+    ]
+    assert len(initializations) == 2
+    assert all("cookie" not in r.headers for r in initializations)
+    assert calls[0].headers["MCP-Protocol-Version"] != ""
     await adapter.close()
 
 
 @pytest.mark.parametrize("kind", ["id", "size", "status", "rpc"])
 async def test_transport_rejects_invalid_or_large_responses(kind):
     async def responder(request):
+        initialization = initialization_response(request)
+        if initialization is not None:
+            return initialization
         body = json.loads(request.content)
         result = {"jsonrpc": "2.0", "id": body["id"], "result": {"tools": []}}
         if kind == "id":
@@ -172,9 +187,39 @@ async def test_transport_rejects_invalid_or_large_responses(kind):
             result["error"] = {"message": "SECRET"}
         return httpx.Response(503 if kind == "status" else 200, json=result)
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(responder))
-    adapter = HttpMcpTransport({}, 1024, client)
+    client = httpx.MockTransport(responder)
+    adapter = McpHost({"default": {"timeout_s": 0.2}}, 1024, client)
     with pytest.raises(McpFailure) as exc:
         await adapter.request(McpServerContext("default", "D", "https://mcp/mcp"), "tools/list", {})
     assert "secret" not in str(exc.value).lower()
     await adapter.close()
+
+
+async def test_transport_bounds_decompressed_payload():
+    async def responder(request):
+        initialization = initialization_response(request)
+        if initialization is not None:
+            return initialization
+        body = json.loads(request.content)
+        data = json.dumps(
+            {"jsonrpc": "2.0", "id": body["id"], "result": {"tools": [], "padding": "X" * 10000}}
+        ).encode()
+        compressed = gzip.compress(data)
+        assert len(compressed) < 1024
+        return httpx.Response(
+            200,
+            stream=httpx.ByteStream(compressed),
+            headers={
+                "content-type": "application/json",
+                "content-encoding": "gzip",
+            },
+        )
+
+    adapter = McpHost({"default": {"timeout_s": 0.2}}, 1024, httpx.MockTransport(responder))
+    try:
+        with pytest.raises(McpFailure):
+            await adapter.request(
+                McpServerContext("default", "D", "https://mcp/mcp"), "tools/list", {}
+            )
+    finally:
+        await adapter.close()

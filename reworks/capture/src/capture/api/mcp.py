@@ -11,8 +11,9 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 
-from capture.runtime import CaptureRuntime, public_result
-from capture.security import CaptureSecurity, TokenValidationError
+from capture.auth import CaptureSecurity, TokenValidationError
+from capture.compatibility import public_result
+from capture.workflow.service import CaptureRuntime
 
 
 class CaptureJwtTokenVerifier(TokenVerifier):
@@ -80,6 +81,9 @@ def create_mcp_server(
             issuer_url=resource_url,
             resource_server_url=resource_url,
             required_scopes=["capture"],
+            # Existing Diapason JWTs have issuer/roles but no MCP resource audience.
+            # Changing that policy needs a separately approved shared auth migration.
+            validate_token_resource=False,
         ),
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
@@ -114,7 +118,7 @@ def create_mcp_server(
             return public_result(result)
         except ValueError as exc:
             raise ToolError(str(exc)) from exc
-        except RuntimeError as exc:
-            raise ToolError(str(exc)) from exc
+        except Exception as exc:
+            raise ToolError("Capture could not complete") from exc
 
     return mcp

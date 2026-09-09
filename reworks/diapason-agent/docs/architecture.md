@@ -61,13 +61,15 @@ tool descriptions, read-only annotations, or a model-generated tool call.
 
 ## ADR-003: explicit MCP boundary
 
-Existing servers use stateless HTTP JSON-RPC, accepting JSON or SSE results without client-managed
-sessions. The async adapter intentionally implements that compatibility subset. It is **not a general
-MCP SDK replacement**: a server requiring initialize/session management, sampling, elicitation,
-resumable streams or notifications needs another adapter behind `McpTransport`.
+Pascal is the host; `mcp/host.py` owns a shared connection pool and creates server-scoped clients.
+The official MCP SDK owns initialization, protocol negotiation, JSON/SSE transport and teardown.
+Clients are operation-scoped for the current stateless Diapason service, with separate cookie/session
+state per caller. Stateful transport is tested during an operation, but conversational server state
+is not retained across calls. Unsupported capabilities and future lifetime decisions are explicit in
+[mcp.md](mcp.md), not hidden behind a partial custom protocol implementation.
 
 Tool schemas are cached, never tool results or cross-request credentials. Cache keys include tenant
-scope, server identity/URL/protocol and a credential fingerprint. A stable fingerprint prevents random
+scope, server identity/URL and a credential fingerprint. A stable fingerprint prevents random
 Fernet ciphertext from defeating caching. Fixed lock stripes deduplicate identical discovery without
 an unbounded lock map. Remote cookies are not replayed across requests. Known ambiguous names fail
 closed. Unknown natural-language @mentions do not silently become tool routes.
@@ -80,7 +82,7 @@ that discards the user's turn.
 
 Reference: [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk), including
 its [transport documentation](https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/client/transports.md).
-The main branch can differ from the pinned 1.x test dependency; do not copy its APIs blindly.
+The main branch can differ from the pinned 1.x runtime dependency; do not copy its APIs blindly.
 
 ## ADR-004: bounded, truthful outputs
 

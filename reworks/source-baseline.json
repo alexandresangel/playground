@@ -1,0 +1,440 @@
+{
+  "date": "2026-09-08",
+  "note": "Baseline before refinements; original code is reference. Frontend baseline is the earlier pending Pascal rework, not the original frontend.",
+  "original": [
+    {
+      "path": ".dockerignore",
+      "sha256": "7483ae714a921999017638b045c55ebe09f4646873eb9fe513b58b6adb77a1be"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "8eb07d4edf607fbaaa9bdf012fd153e0c177dd67f42c7dc8bbb385b87afbbb4d"
+    },
+    {
+      "path": "app.py",
+      "sha256": "3ab93ad187ea375075ea2714174b23496b47c352a8ceea7729c220a2b1c8c63d"
+    },
+    {
+      "path": "auth_setup.py",
+      "sha256": "9ef43fe9c65e360c8e10e17dfb7feee64c8ebf4563dac02aaf8ffc481109aa20"
+    },
+    {
+      "path": "blob_client.py",
+      "sha256": "b3d9e5929297b9f8ec589d86150fc50f26f64b81e772ca213bc8ea1cd3690376"
+    },
+    {
+      "path": "build_info.py",
+      "sha256": "071a29d1a705a9e0b6fb5914cee1cb154de4b59169b55b86ee59532ff2539317"
+    },
+    {
+      "path": "config.example.json",
+      "sha256": "1c0f0890cbafcd8fedbb51c776757c0411ba69ddbf89ce0a971cf6ecb1004898"
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "11f4800596c5d0368ed2a6a2418a3a8007b79d98dee602841754498b1d6dc4a8"
+    },
+    {
+      "path": "i18n.py",
+      "sha256": "2c81590f45d83f4ec59b82607563f1bf1e3616c8f71c59b10d08e8d1de662cf6"
+    },
+    {
+      "path": "ic_prompt_loader.py",
+      "sha256": "616d34fa1aba89dccd9038cd93684a5bad4587fe12da9db1dd89880d3621af5c"
+    },
+    {
+      "path": "mcp_context.py",
+      "sha256": "55d88e2710b521ee2aab03f5770376967c7f8df3e8f49a90dbea564985126db4"
+    },
+    {
+      "path": "mcp_rpc.py",
+      "sha256": "d3b2ab25417848f941a777e4eeefadc066c208d8732608ed91bd86adb36e1af6"
+    },
+    {
+      "path": "prompt_loader.py",
+      "sha256": "40229f167d0ea89847105265f39f035674f1b03d81a46db4cc9bc053193da533"
+    },
+    {
+      "path": "README.md",
+      "sha256": "f889cd330865f72b43f2dd57ce4f3d0209748e8764436d455d353b7688e35d19"
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "44f82c2f00bba32f4960e39330c0da64d6f0e8b37be47118f6e6e3e2661ab9bf"
+    },
+    {
+      "path": "session_store.py",
+      "sha256": "f67690aaa59c4f688405228dbe04f002e48c0d6cf9db728c8f0613536fe48655"
+    },
+    {
+      "path": "settings.py",
+      "sha256": "dda7d6c0ae150024189e8a566a01aad30f8331741e16a117404c46be56b64526"
+    },
+    {
+      "path": "source_extract.py",
+      "sha256": "00a3a7b97017804ce6ea8f58aae0b142694719b3ab5a0d414dc30924212c29b6"
+    },
+    {
+      "path": "system_prompt.md",
+      "sha256": "92b632c1fed922540eaa775a9bd58ea0ae232d3728f2f5489d41b969714c0821"
+    },
+    {
+      "path": "telemetry.py",
+      "sha256": "2f7b139ff47d1b13348ef59cc800f33706acd2614d9ab4a27f1e779b40200327"
+    },
+    {
+      "path": "tool_audience.py",
+      "sha256": "889fd68602ef5b27c48d697397c93e927e4b87f7d6ec37445d44ab1f204fbd27"
+    },
+    {
+      "path": "VERSION",
+      "sha256": "fecf23c4b3c2c29381d4c14cacb998939eb53f5791b99ab7e4e0bc7972c44524"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "sha256": "7b5045a679d75977c653b6f1009edec7dc282e198eca68259eb3cc5f9f19a2f6"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "fe0b1d47a2e3d732ca6a3fa5cd621d3b8d54545326420a3b5dbc31e5fadbe90f"
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "sha256": "b5f0c9c57f247c7d94c4a6f7322ff73ec0a8dd4837374a75b203f3df58fed88f"
+    },
+    {
+      "path": "data/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "deploy/.terraform.lock.hcl",
+      "sha256": "f9d395eed47579fb6868520d4cde9140e97b90f62427ac51a3eb814fe40a84e2"
+    },
+    {
+      "path": "deploy/deploy-config.sh",
+      "sha256": "b52f8c312cb2f6e6028f3dac9ab6ed9d0866b00016306b3cc6b455a8e6beb513"
+    },
+    {
+      "path": "deploy/deploy.sh",
+      "sha256": "b799522c738859244334b4ebc858545befefbbd8d0dc0b86c2e606d36dee73bc"
+    },
+    {
+      "path": "deploy/infra.tf",
+      "sha256": "c0666e6f09a0ea30119ac1ee39d603df2b6444726d05e580718c681158c9f747"
+    },
+    {
+      "path": "dia_jwt/auth.py",
+      "sha256": "bd944eee75f7e5304205153da2a6ba0cb36aa67fa36656035cc657dbee01bc5b"
+    },
+    {
+      "path": "dia_jwt/cli.py",
+      "sha256": "29d5b8cd8ec39dfadde48e437f19e1ab25c3bcd4bbca330fe96d242c51efa2ef"
+    },
+    {
+      "path": "dia_jwt/fastapi.py",
+      "sha256": "2a8e215de30a4c6728a79f663aed8e5a77cf9d8b1cbe028c9fb56465816f1a98"
+    },
+    {
+      "path": "dia_jwt/README.md",
+      "sha256": "d70647521b228111357ceb74bbb257c6d30a287560ea71159e65b9c34f4d0f82"
+    },
+    {
+      "path": "dia_jwt/__init__.py",
+      "sha256": "cb3998df47ae7a523c847e2b1aee8cc5e3b2f1e5cc0a91a06e1d13de14263a85"
+    },
+    {
+      "path": "dia_jwt/__main__.py",
+      "sha256": "d27fd9885b6a6a0a672855241be184f04aca90a1dbe583e46d5fbaae5538c932"
+    },
+    {
+      "path": "docs/01-issues-and-risks.md",
+      "sha256": "75f951826a06eb832b2472beb774a342a00130cdf8900bcd140a71e64fa3f863"
+    },
+    {
+      "path": "docs/02-roadmap-1-month.md",
+      "sha256": "c67d3a2b56245da8ed00eb6ebdf1df4430395e404762790b79d42068f4b0103a"
+    },
+    {
+      "path": "docs/03-target-architecture.md",
+      "sha256": "ecf2867a8ae2ae0687a26bb2af1b5e75b91998ba5bef6e6735c24841d548fc72"
+    },
+    {
+      "path": "docs/04-intelligence-contract-design.md",
+      "sha256": "c31a4c33f0c2b96c0781ad8f0707804e722f549906e53a0d100fadf572a03992"
+    },
+    {
+      "path": "frontend/build.mjs",
+      "sha256": "456314b6d396a12f8e9bcb75c09b55866ce5f2655f248504ad40a38bc1e34583"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "sha256": "6a361133ee32ab5d9d7705b3e53a3524e3797c7cecb3ed3f16d8e213aa209cd2"
+    },
+    {
+      "path": "frontend/package.json",
+      "sha256": "e64f740ec854aacff2b1321d49314bdd3ba42f045d4f50124a33c58f2dabe14b"
+    },
+    {
+      "path": "frontend/src/boot.js",
+      "sha256": "7d982cf49dcdc4aab7c8d4b8cd0ae2bfd2d0039d075905692289caebd098197e"
+    },
+    {
+      "path": "frontend/src/chat-app.js",
+      "sha256": "9bd53ce6461fc9c74fb129941a8bd54686e3d77384602a7decdfb124817c9077"
+    },
+    {
+      "path": "frontend/src/vendor.js",
+      "sha256": "f6bb478254a4543df5986079cf32d31011a807762880ea041b09e17785066500"
+    },
+    {
+      "path": "locales/en_us.json",
+      "sha256": "9e743c95f206b236e9ca5229614c3263268bf0de4a60749f3e710b1714a2feb0"
+    },
+    {
+      "path": "locales/fr_fr.json",
+      "sha256": "209f2c001e5e6144c275375db5a61a5f25cab57520a8c7dd679430764b478f46"
+    },
+    {
+      "path": "observability/generate_dashboards.py",
+      "sha256": "4053bc1453b938d266287e08b66026487aa724cb1a9efdb0ff417a806a81e270"
+    },
+    {
+      "path": "observability/grafana-agent-mcp-dev.json",
+      "sha256": "0db0684821c8af655debbed2ee6e5e231902a3b8a7206360693ae1d0fe704bc9"
+    },
+    {
+      "path": "observability/grafana-agent-mcp-prod.json",
+      "sha256": "85e6d7b3bf4edb84fba6c844a20c33078598def3d02489d59ab5925b4d6beca1"
+    },
+    {
+      "path": "observability/grafana-agent-mcp-test.json",
+      "sha256": "c9ff6d038bd5fe0ffd1fdfa63a4d1102befce96a9ef4bb2d60ea80d170a401cb"
+    },
+    {
+      "path": "skills/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "skills/intelligence_contract/entity_match.py",
+      "sha256": "50d217a2e9a0c6a5b4aec1e8b15d82eb44c2686332f5277e5323c49f86fbb2be"
+    },
+    {
+      "path": "skills/intelligence_contract/extract_xml.py",
+      "sha256": "6a6cf7b6d7699c7402b58837ee5af2301c88fd1af1bbfd99fc808cc5f4af13f7"
+    },
+    {
+      "path": "skills/intelligence_contract/run.py",
+      "sha256": "baeaff7ed11c1e8992b499dd475d3c7fe1e30da1e48b280f654a82c220b56535"
+    },
+    {
+      "path": "skills/intelligence_contract/xml_fields.py",
+      "sha256": "b9f91d1be870ffdabb84fe6794215486c8b31aa2195c41055f610ae9a7464e05"
+    },
+    {
+      "path": "skills/intelligence_contract/__init__.py",
+      "sha256": "84bbeec1f27135a9c4453f9520d89d54fbc6b0f92d664f46532f7b5982d8415b"
+    },
+    {
+      "path": "skills/intelligence_contract/config/catalog.json",
+      "sha256": "2e266222f872b043b8b479e5f0faed5c3ace141219e47b8dd460db0bb04d6f35"
+    },
+    {
+      "path": "skills/intelligence_contract/config/README.md",
+      "sha256": "445a9435fe6d18477216629314cd537d85803123cea99b5fc1684d2076b98792"
+    },
+    {
+      "path": "skills/intelligence_contract/config/trade.xml",
+      "sha256": "8aa106f0e2d87282a3c0634754e8459650e1d8ed02d1a305083ed283fe940af9"
+    },
+    {
+      "path": "skills/intelligence_contract/config/upload.sh",
+      "sha256": "33593624a4ba36a0cfcd4bcd002badf6d444e492d5f9580ee03ab572025d9096"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/buyCertificateOfDeposit.txt",
+      "sha256": "1df103139430443702af90b3db2057e2b6ce376b38374da14624af63ed6db4af"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/buyDiscountedPaper.txt",
+      "sha256": "1dd1edc66e43354864ada1fcf479ad2b40804af9d361fe6ad4e6cd8fe29f9cf4"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/commercialLeaseClassic.txt",
+      "sha256": "5155be9839b12facdafaff9e7d02afb8355c639f9d010e8510562ea12c275697"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/discountedDeposit.txt",
+      "sha256": "f80cd8f0230e25d389229311520f5e5c0eecbc356be2b77d301e5598ae4866d0"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/mltLoan-with-entities.txt",
+      "sha256": "3c10425a528fae1ac9ebb0f460a3d6da137709ef027d52ce53cd348c4b9a25ee"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/mltLoan.txt",
+      "sha256": "68c97f35a0a9ffd90fdbe81fe93cc80262a7d7ea74f08b87e3eb6847c297c6a2"
+    },
+    {
+      "path": "skills/intelligence_contract/config/prompts/mltLoanPerpetual.txt",
+      "sha256": "11b5c286c849afc267e5e3b1a3d8c83c629aa0907aefc8b78e5f53317ad9a748"
+    },
+    {
+      "path": "static/index.html",
+      "sha256": "a92c8ace432ace1d2b040cbf794631c4eab63bc89692b24cabdfc38dcf6b9f79"
+    },
+    {
+      "path": "static/agent/agent-widget.css",
+      "sha256": "a22918988e80a4d6659ce9d0027443e11ef1feb53e7f685ab4e60e92a6145fe4"
+    },
+    {
+      "path": "static/agent/agent-widget.js",
+      "sha256": "c665c4e3ae12eeeac95db4a2a838c1114668dcb34bd9442f7982bd43b066d015"
+    },
+    {
+      "path": "static/agent/dia-logo.png",
+      "sha256": "9661c561e0a20510d80f59327b4fa2014c5f2b21078aa6446bca58ec3afd3219"
+    },
+    {
+      "path": "static/agent/logo-p.png",
+      "sha256": "9661c561e0a20510d80f59327b4fa2014c5f2b21078aa6446bca58ec3afd3219"
+    },
+    {
+      "path": "static/agent/logo-pascal.png",
+      "sha256": "ae97274cb7ccb84e3b9bc142b836160b1e50ff686efd9aa5db051437ad6e1b3b"
+    },
+    {
+      "path": "test/test.api.example.json",
+      "sha256": "6d81f4a408a12faa992c407f757017ae1e55758d49518cc5a803a2c65ebe465f"
+    },
+    {
+      "path": "test/test_agent_smoke.py",
+      "sha256": "f7e8e27a701942754887f9044056f573962585720a63e97d40c810a11e22fe1d"
+    },
+    {
+      "path": "test/test_assistant_identity.py",
+      "sha256": "e44ce6fb4f14be6ab3520dd7d5bb2d25c4569bf575ddee8a213fd0e44728dd44"
+    },
+    {
+      "path": "test/test_entity_match.py",
+      "sha256": "61612062e12306539b495c7ecaa457194ae701917a26af6f390c234a2c8fe37f"
+    },
+    {
+      "path": "test/test_extract_trade_type.py",
+      "sha256": "17cfd837ea49668df5b58765892511ca0d393ac49822d54ef4cba9f9c57d9d4e"
+    },
+    {
+      "path": "test/test_i18n.py",
+      "sha256": "a8bd32019e8f39c85ac312d2f08cae0291df5ccee8500291f64d05b0a3670513"
+    },
+    {
+      "path": "test/test_ic_catalog.py",
+      "sha256": "cc72dd6a1209cddab005b51baadbbaf0165fc1b283ccf7eb9a8a6bd83ab1edfd"
+    },
+    {
+      "path": "test/test_mcp_cluster.py",
+      "sha256": "7bf951e51ea7788ed494c0aabc72732d56a490f7b3564598f15462f5eae69787"
+    },
+    {
+      "path": "test/test_session_summary.py",
+      "sha256": "2cf39fc10ca51e4ba66921bfb9fed2e35fe2974787661e0393ffa5c55b8cd098"
+    },
+    {
+      "path": "test/test_source_extract.py",
+      "sha256": "6c39b29de9822b517425c455a6cbfe7ac9d074da31624216654509b8db49f185"
+    },
+    {
+      "path": "test/test_telemetry_helpers.py",
+      "sha256": "1c0f47530569642cab3e4e61fb8629e82ed5fe5368f24abe235a93f0360977f7"
+    },
+    {
+      "path": "test/test_tool_audience.py",
+      "sha256": "f2dd8a054537545b633c8b26657317340ff2285ce646ee6b66a22c2771bb26d7"
+    },
+    {
+      "path": "test/test_tool_route.py",
+      "sha256": "3669f0631685928e403d67ab4d956158c13c3788220c13efc24743c575ec9651"
+    },
+    {
+      "path": "test/test_xml_fields.py",
+      "sha256": "4a2461a0177d1472bfddc86694d41379108844eca72a743a4cf50063067ce19e"
+    },
+    {
+      "path": "test/fixtures/sample-loan-contract.pdf",
+      "sha256": "1f5ca604db4128cad6316d1d4167524dfb16bcabe39dd4d8a6713372f8072454"
+    }
+  ],
+  "frozen_frontend": [
+    {
+      "path": "reworks/diapason-agent/frontend/build.mjs",
+      "sha256": "456314b6d396a12f8e9bcb75c09b55866ce5f2655f248504ad40a38bc1e34583"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/package-lock.json",
+      "sha256": "ed2efbd4a2d301b76a8a439a286b714aadf6ee934998944360a307452e63cde0"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/package.json",
+      "sha256": "1f9d58359c2fcf55a94eeb13082a96e1885a6a5262f1ad2f374ca42e98f6211d"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/.mypy_cache/.gitignore",
+      "sha256": "ffbb394643c112f2356bb5f3184e95e33fd732146892f4eeead126975570ff39"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/.mypy_cache/CACHEDIR.TAG",
+      "sha256": "70ebb54facb76f7dab3058261eefb43a2315d28d10fcf90a85538c05a72b8d1e"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/.mypy_cache/3.12/cache.db",
+      "sha256": "ebef11db0eedaa130f351aff724d494db52dae9fae8ba51f184392d2a9db90ab"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/src/boot.js",
+      "sha256": "7d982cf49dcdc4aab7c8d4b8cd0ae2bfd2d0039d075905692289caebd098197e"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/src/chat-app.js",
+      "sha256": "b1b69d7a949e1a5ea84db3114c74b3002e06ff7c11f2524d59802ac53392846c"
+    },
+    {
+      "path": "reworks/diapason-agent/frontend/src/vendor.js",
+      "sha256": "1fbacf997147ac97be6ee1a770ff93a61396b37a7f0148a1589a308ce4ea47d5"
+    },
+    {
+      "path": "reworks/diapason-agent/static/index.html",
+      "sha256": "a92c8ace432ace1d2b040cbf794631c4eab63bc89692b24cabdfc38dcf6b9f79"
+    },
+    {
+      "path": "reworks/diapason-agent/static/agent/agent-widget.css",
+      "sha256": "a22918988e80a4d6659ce9d0027443e11ef1feb53e7f685ab4e60e92a6145fe4"
+    },
+    {
+      "path": "reworks/diapason-agent/static/agent/agent-widget.js",
+      "sha256": "c665c4e3ae12eeeac95db4a2a838c1114668dcb34bd9442f7982bd43b066d015"
+    },
+    {
+      "path": "reworks/diapason-agent/static/agent/dia-logo.png",
+      "sha256": "9661c561e0a20510d80f59327b4fa2014c5f2b21078aa6446bca58ec3afd3219"
+    },
+    {
+      "path": "reworks/diapason-agent/static/agent/logo-p.png",
+      "sha256": "9661c561e0a20510d80f59327b4fa2014c5f2b21078aa6446bca58ec3afd3219"
+    },
+    {
+      "path": "reworks/diapason-agent/static/agent/logo-pascal.png",
+      "sha256": "ae97274cb7ccb84e3b9bc142b836160b1e50ff686efd9aa5db051437ad6e1b3b"
+    },
+    {
+      "path": "reworks/diapason-agent/static/js/boot.js",
+      "sha256": "7d982cf49dcdc4aab7c8d4b8cd0ae2bfd2d0039d075905692289caebd098197e"
+    },
+    {
+      "path": "reworks/diapason-agent/static/js/chat-app.js",
+      "sha256": "b1b69d7a949e1a5ea84db3114c74b3002e06ff7c11f2524d59802ac53392846c"
+    },
+    {
+      "path": "reworks/diapason-agent/static/js/vendor.bundle.js",
+      "sha256": "7f96f8105f410295c91dfd0be2f50437bb6478c142c411f0a7bd9d0dccd69798"
+    }
+  ]
+}

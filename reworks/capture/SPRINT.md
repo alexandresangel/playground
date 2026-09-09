@@ -1,85 +1,156 @@
-# Capture — delivery and acceptance board
+# Capture — sprint board
 
-Sprint objective: isolate the legacy intelligence-contract flow as its own Capture ACA, with one
-LangGraph behind HTTP/MCP and direct Diapason REST resolution. Preserve extraction behavior,
-security, UI result contracts and Loki/Tempo compatibility. Updated 2026-09-07.
+Updated 2026-09-09. The original project is still current; this rework is pending migration.
+Three stories separate Python migration, deployment/integration and later business validation.
+Tasks marked **local implementation verified** are not a claim of deployment or business acceptance.
+Named people, dates and estimates are deliberately left for team planning.
 
-Legacy US-001–US-006 map to CAP-US001–CAP-US006 below. Keep the old ID as an alias on existing
-tickets, not as a second story; use the CAP- IDs for cross-repository references.
+Layout follow-up (2026-09-09): common code is duplicated inside each app at matching responsibility-based
+paths. Removed the shared package/sync/manifests and flattened one-file compatibility wrappers;
+Capture also groups extraction and orchestration in one workflow folder. See [reuse](docs/reuse.md).
+Local implementation is complete; verification evidence is in [verification](docs/verification.md).
 
-## Tracking rules
+## US1 — Python migration
 
-Assign people to the accountable roles at planning. Estimates are indicative engineering days.
-**Verified local** means implemented with named local evidence, not deployed or product accepted.
-**Review** means implementation exists but acceptance evidence is incomplete. **External gate** needs
-the named environment, fixtures or decision. **Ready** is future work. Do not mark a whole story Done
-while an acceptance criterion is still an external gate.
+### Description
 
-Each accepted task needs commit/image SHA, dated command/scenario result, reviewer and evidence link.
-Use task IDs in commits. No contracts, credentials or personal data in tickets. Pascal work lives in
-../diapason-agent/SPRINT.md; reference that board instead of duplicating its status.
+Migrate contract capture to one maintainable Python/LangGraph workflow while retaining the original extraction outcomes, security rules and caller contracts. Keep business code separate from protocols and reusable infrastructure.
 
-## Stories and acceptance criteria
+### Acceptance criteria
 
-| Story | User story | Acceptance criteria | Status |
+- HTTP and MCP call the same seven-stage workflow; no MCP client or duplicate extraction is present.
+- Original catalog/prompts, PDF/XML transformations, caller-selected trade_type and direct resolver form/result semantics are retained; deterministic fixtures pass.
+- Package boundaries, reusable Azure/Blob/REST code and retained/refactored/added sections are documented.
+- JWT roles, issuer, revocation/customer binding and identity forwarding remain compatible; old aliases are isolated.
+- Real-document equivalence is demonstrated by CAP-R005 before migration acceptance (still open).
+
+### CAP-M01 — Map the original extraction contracts
+
+Description: Trace the original runner, PDF/XML helpers, catalog and sibling MCP resolver; record provenance and a field-level interface inventory. This task specifies parity, it does not rewrite the graph.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+### CAP-M02 — Group extraction and execution in one workflow
+
+Description: Move the seven existing stages into explicit LangGraph nodes/state/context, keep pure transformations in workflow/extraction.py, and put timeout/lifecycle ownership in workflow/service.py. Preserve prompts and extraction decisions.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+### CAP-M03 — Extract reusable model, Blob and direct REST adapters
+
+Description: Use the local Azure v1 client with explicit dated compatibility, retain Blob credential selection, and port only the resolver REST/form/parser behavior. Keep identical common files at matching paths in both app packages; document manual maintenance without a shared package or sync script.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+### CAP-M04 — Implement independent HTTP and optional MCP front doors
+
+Description: Keep multipart metadata/capture contracts, map internal steps to existing display fields, share identity validation, and make FastMCP lazy/optional. Document relocation to a central MCP server without changing the workflow.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+### CAP-M05 — Verify deterministic behavior, isolation and failures
+
+Description: Run extraction/catalog/form/auth/runtime/SDK tests, HTTP-only imports, deadlines, payload bounds, public error privacy, no ambient LangSmith export, and local adapter behavior. Real-model scoring belongs to US3.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+### CAP-M06 — Document the migration for maintainers
+
+Description: Maintain architecture, provenance, compatibility/security, client-mode and MCP relocation explanations. Propose extraction improvements separately; do not implement OCR/prompt repair in this migration.
+
+Status: local implementation verified; see `docs/verification.md` and `docs/provenance.md`.
+
+## US2 — Independent deployment and platform integration
+
+### Description
+
+Package Capture as an independently buildable ACA service using the organization's existing
+registry, shared deployment helpers, secrets/identity conventions and Loki/Tempo servers.
+Keep backend and end-user integration contracts unchanged.
+
+### Acceptance criteria
+
+- A locked, non-root image builds and passes Linux/offline startup tests without baked credentials.
+- The repository CI gates image deployment; promotion reuses the tested immutable artifact.
+- Platform reviews the actual Terraform state/module plan, managed identity/RBAC, secrets, ingress,
+  probes and timeout configuration before applying it.
+- Authenticated integration and existing UI/host behavior pass in the target environment.
+- Logs and traces correlate in the existing Loki/Tempo servers; metrics reach an explicitly approved
+  metrics receiver, not a Loki/Tempo URL.
+- CAP-R001 through R004 and R006 are signed off. These external gates remain open.
+
+### CAP-D01 — Build a reproducible runtime artifact
+
+Description: Lock Python/build dependencies and base image digests, package standalone sources/assets, test a non-root image and verify offline probes. This task owns the image, not Azure resources.
+
+Status: Local image/test work; final evidence in verification report.
+
+### CAP-D02 — Prepare ACA infrastructure and deployment workflow
+
+Description: Adapt the legacy shared helper/Terraform conventions, independent app identity and immutable promotion. Verify local syntax; platform must review state ownership and execute the real plan/apply.
+
+Status: Artifacts prepared; actual provision/deploy pending R001.
+
+### CAP-D03 — Configure runtime trust, secrets and permissions
+
+Description: Map existing JWT/key/config secrets, managed identity Blob roles, Azure deployment endpoint/client mode, trusted downstream URLs and network/probe settings. Do not change security policy implicitly.
+
+Status: Documented; corporate credentials/RBAC and risk sign-off pending R002/R006.
+
+### CAP-D04 — Integrate callers and neighboring services
+
+Description: Validate classic/composer HTTP and Capture MCP routes, required per-request identity/PDF/trade_type, session receipt ownership and unchanged host open-trade event. No backend/frontend edits in this task.
+
+Status: Fixture contracts verified; real host/services pending R002/R003.
+
+### CAP-D05 — Implement and validate observability
+
+Description: Use matching local observability/telemetry.py modules for OTLP HTTP logs/traces/metrics, safe error spans, bounded metric labels and W3C propagation. Preserve full legacy signal URLs and explicitly configure the metrics receiver. Verify with local protobuf collector; then inspect actual Loki/Tempo and metrics routing.
+
+Status: Local exporter tests verified; target-server inspection pending R004.
+
+## US3 — Business validation and controlled rollout (later)
+
+### Description
+
+Demonstrate that the pending migration works on approved real business inputs and at expected load,
+then decide whether it can replace the current implementation. Fixture success is not this acceptance.
+
+### Acceptance criteria
+
+- SMEs approve representative inputs and expected outcomes, including failures and both user audiences.
+- Baseline and candidate runs use recorded prompt/model/config versions and no unexplained regressions.
+- Load/failure/security checks establish acceptable latency, cost, isolation and recovery.
+- Every release gate below has evidence and an assigned approver before broad promotion.
+
+### CAP-V01 — Define the evaluation corpus and scoring
+
+Description: Select approved PDFs across trade types, record original extraction/resolution outputs, compare structured business fields/XML and review warnings. Do not treat mock PDF text or nondeterministic exact XML equality as a business-quality metric.
+
+Status: pending SME/data access; R005.
+
+### CAP-V02 — Execute target-environment integration and resilience checks
+
+Description: Use approved keys/services to test both tenants, real Blob/MCP/backend access, all three Capture entry paths, trace correlation, timeouts, disconnects and representative concurrency. Record expected versus actual results and deployment digest.
+
+Status: pending platform/QA environment; R002–R004/R006.
+
+### CAP-V03 — Review canary evidence and promote or roll back
+
+Description: Agree acceptance thresholds with product/SRE, deploy an isolated/canary revision, review regressions and promote the same tested image only after approval. Preserve the prior revision and current data contracts for rollback.
+
+Status: pending all release gates; no cloud deployment performed by this refinement.
+
+## Release gates (stable IDs)
+
+| Gate | Acceptance evidence | Owner to assign | State |
 |---|---|---|---|
-| CAP-US001 | As a classic Diapason user I submit PDF + trade type and obtain the same prefilled view. | AC1 same endpoint/fields/headers/metadata/result; AC2 caller controls trade_type; AC3 approved prompt/catalog parity; AC4 golden PDFs open identical host views. | Review; host acceptance open |
-| CAP-US002 | As a maintainer I test/observe Capture stages without duplicated extraction logic. | AC1 seven graph stages; AC2 shared runtime for HTTP/MCP; AC3 runtime-only credentials; AC4 no checkpointer or extraction redesign. | Verified local |
-| CAP-US003 | As an operator I remove the internal MCP proxy without changing reference resolution. | AC1 no MCP client; AC2 REST form/XML/parser/retry parity with diapason-mcp-main; AC3 token/scope/trace forwarding; AC4 actual backend output parity. | Review; live backend gate |
-| CAP-US004 | As Pascal I invoke Capture with a supplied PDF and explicit trade_type. | AC1 stateless /mcp capture tool; AC2 same JWT/tenant rules; AC3 encoded/decoded size bounds; AC4 real Pascal forwards identity and runs the same graph. | Review; Pascal E2E gate |
-| CAP-US005 | As platform operator I deploy and promote Capture independently. | AC1 separate ACA/image/identity/config-reader scope; AC2 runtime-only secrets; AC3 immutable image promotion; AC4 image/plan/revision/probes verified. | External gate |
-| CAP-US006 | As operator I correlate Capture in existing Loki/Tempo without contract content. | AC1 same OTLP env/headers; AC2 ingress/downstream W3C; AC3 node spans; AC4 sanitized live trace and correlated log. | Review; collector gate |
+| CAP-R001 | Organization CI, approved infrastructure/state plan, immutable image and dev revision | Platform | Open |
+| CAP-R002 | Corporate JWT/roles, tenant isolation, real Blob/model/MCP/REST access | Security + integration | Open |
+| CAP-R003 | Real Diapason embedding/composer and prefilled trade-open behavior | QA + UI/backend owners | Open |
+| CAP-R004 | Same trace in Tempo and log in Loki; correct metrics receiver/labels and privacy | SRE | Open |
+| CAP-R005 | SME-approved golden baseline/candidate scoring and performance thresholds | DS/MLE + product | Open |
+| CAP-R006 | Explicit acceptance/remediation of legacy revocation, CORS, storage and trust risks | Security + platform | Open |
 
-## Task ledger
-
-Owners are accountable roles; assign actual people and target sprints before execution.
-
-| ID | Story / AC | Deliverable and completion evidence | Owner | Days | Depends on | Status |
-|---|---|---|---|---:|---|---|
-| CAP-T001 | US001 AC1 | Contract inventory in docs/integration.md; compare old API schemas/UI open-trade handler. | API + QA | 0.5 | — | Review; host sign-off R003 |
-| CAP-T002 | US001 AC3 | Compare all used catalog/prompt assets with legacy. Record allowed filename/line-ending transforms and explain every remaining diff. | Capture eng. | 0.5 | T001 | Review; attach content-diff report |
-| CAP-T003 | US001 AC1–2 | Compatibility GET/POST, required PDF/trade_type, same public result. Run tests/test_app.py, test_runtime.py, test_extraction.py. | API eng. | 1 | T001/T002 | Verified local |
-| CAP-T004 | US001 AC4 | Golden PDFs per supported type, expected XML/reference fields and UI result. Compare both implementations and obtain SME approval. | QA + treasury SME | 2 | T003/R001 | External gate: fixtures/backend/host |
-| CAP-T005 | US002 AC1 | Typed StateGraph: validate, parse, select, extract, normalize, resolve, emit. Run tests/test_workflow.py. | Capture eng. | 1 | T002 | Verified local |
-| CAP-T006 | US002 AC2 | Both front doors call CaptureRuntime.execute; inspect call paths and run app/runtime/workflow tests. | Capture eng. | 0.5 | T005 | Verified local |
-| CAP-T007 | US002 AC3–4 | No credential state/checkpointer or added extraction repair loop; architecture/security review. | Capture + security | 0.5 | T005 | Verified local |
-| CAP-T008 | US003 AC1–2 | Direct resolveReferences adapter from diapason-mcp-main; XML/form/retry checks in tests/test_diapason.py. | Integration eng. | 1 | T001 | Verified local |
-| CAP-T009 | US003 AC3 | Per-request token/scope/W3C; inspect outgoing mock request and prove no MCP client imports. | Integration + security | 0.5 | T008 | Verified local |
-| CAP-T010 | US003 AC4 | Actual approved dev resolveReferences responses match legacy for golden contracts. | QA + backend owner | 0.5 | T004/T009/R001 | External gate: backend access |
-| CAP-T011 | US004 AC1 | FastMCP stateless mount/lifespan/tool schema and public result; app MCP tests. | API eng. | 1 | T006 | Verified local |
-| CAP-T012 | US004 AC2–3 | Token/customer/header checks and base64 size/format negatives; app/runtime tests. | Security + API | 1 | T011 | Verified local |
-| CAP-T013 | US004 AC4 | Pascal trusted Capture config forwards dynamic identity, other servers do not. Link PAS-T012 and test_mcp.py evidence. | Pascal eng. | 0.5 | T012/PAS-T010 | Review; live R004 remains |
-| CAP-T014 | US005 AC1–2 | Non-root Docker, separate Terraform ACA/RBAC and runtime secrets. Static HCL/shell review, then image/plan evidence. | Platform | 1 | T003/T011 | Review; R001 |
-| CAP-T015 | US005 AC3 | Dev SHA build; test/prod same-image promotion through shared deployment helpers. Archive CI/image digest. | Platform | 1 | T014 | External gate: organization CI |
-| CAP-T016 | US005 AC4 | Verify startup/readiness/liveness/scaling in shared module plan and actual ACA revision, not assumption. | Platform + SRE | 0.5 | T015 | External gate: rendered spec |
-| CAP-T017 | US006 AC1–3 | OTLP headers/endpoints/request IDs/node spans. Dedicated exporter/trace assertions and configuration review. | Observability eng. | 1 | T005/T009 | Review; instrumentation exists |
-| CAP-T018 | US006 AC4 | One live Pascal→Capture→Diapason trace and Loki log; inspect all fields for PDF/XML/secret leakage. | SRE + security | 0.5 | T017/R001 | External gate: collectors |
-| CAP-T019 | All local ACs | Clean lint/tests/wheel/dependency/shell/HCL checks; attach reproducible commands and release SHA. | QA + platform | 0.5 | T003–T018 as applicable | Review; 20 tests rerun, release report pending |
-| CAP-T020 | Cross-project | Keep docs/board consistent and assign deferred work; review acceptance evidence, not checkboxes alone. | Tech lead | 0.5 | T001–T019 | Review |
-
-## Release gates
-
-| ID | Required scenario/evidence | Owner | Exact dependency / status |
-|---|---|---|---|
-| CAP-R001 | Capture image build, Terraform init/validate/plan, approved dev deploy, health/ready/auth smoke. Record image SHA and revision. | Platform + QA | Open: Capture image evidence; external shared module and organization credentials (Pascal's local image build does not close this) |
-| CAP-R002 | Golden matrix: all trade types, missing inputs, malformed/oversize/scanned PDF, resolver failure; compare legacy outputs. | QA + SME | External: approved fixtures + dev backend |
-| CAP-R003 | Classic UI and Pascal composer open the same prefilled host view via dia-agent-open-trade, same user scope. | Product + UI QA | External: Diapason host; PAS-R003 depends on this |
-| CAP-R004 | Real Pascal tool invocation with PDF bytes + explicit type and same identity; missing inputs not invented; cross-tenant denial. | Pascal + QA + security | External: PAS-T012 and approved file flow; PAS-F007 for large files |
-| CAP-R005 | Inspect live Loki/Tempo, measure latency/memory and revision drain against agreed thresholds. | SRE | External: R001 + collector access; no SLO claimed yet |
-| CAP-R006 | Accept or mitigate revocation, retention and debug limitations before broad rollout. | Product + security | External: explicit risk decision |
-
-## Ready backlog outside extraction parity
-
-| ID | Work | Owner / gate |
-|---|---|---|
-| CAP-F001 | Shared revocation and retention/redaction, including historic blobs/debug responses | Security/privacy; PAS-F001/F003 |
-| CAP-F002 | Opaque authorized PDF handles instead of base64 in model context | Pascal/Capture/UI; PAS-F007 |
-| CAP-F003 | Durable jobs if measured latency exceeds ingress budget | Platform/Capture; approved API/UX contract first |
-| CAP-F004 | XML schema/repair, OCR, extraction quality/model changes | Capture/SME; separate golden-PDF evaluation |
-
-## Latest local evidence
-
-2026-09-07: .venv/Scripts/python.exe -m pytest from this folder: **20 passed**, one dependency
-deprecation warning. Earlier work included wheel/dependency and shell/HCL checks; rerun those against
-the release commit. No ACA deployment, golden-contract E2E, host acceptance or live Loki/Tempo
-validation is asserted here. Pascal's local forwarding/proxy tests do not close these external gates.
+Earlier six-story/file-oriented boards are superseded. Prior audit/task references are historical;
+release gate IDs above and future-work IDs in the relevant follow-up document remain stable.

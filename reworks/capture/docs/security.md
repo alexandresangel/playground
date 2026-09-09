@@ -37,6 +37,11 @@ MCP HTTP authorization is compatibility-first: it validates the same agent-issue
 request. The MCP specification’s OAuth protected-resource metadata should become the long-term public
 integration contract if clients outside Pascal are added.
 
+The SDK adapter explicitly disables resource-audience validation because the existing agent JWTs
+do not carry that audience. This preserves the current policy; it is not a claim of full modern MCP
+OAuth/resource-server compliance. Centralizing the MCP server requires an approved delegation model,
+not simply sending these tokens to a new public server.
+
 ## Deployment checklist
 
 - Store `CAPTURE_CONFIG`, the PKCS#12 base64, and OTLP credentials in Infisical/ACA secret references.

@@ -126,4 +126,3 @@ Specific rules for this trade type to complete the input mask
   - Field "spread(bps)" is filled in with [SPREAD]
 
 *************************************************************
-

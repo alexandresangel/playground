@@ -2,7 +2,7 @@ import base64
 
 import pytest
 
-from capture.runtime import CaptureRuntime
+from capture.workflow.service import CaptureRuntime
 
 
 def _runtime_for_decode(max_bytes: int = 20) -> CaptureRuntime:

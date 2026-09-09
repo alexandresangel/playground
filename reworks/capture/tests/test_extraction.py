@@ -1,6 +1,6 @@
 import pytest
 
-from capture.extraction import (
+from capture.workflow.extraction import (
     apply_trade_type_shortname,
     count_extracted_fields,
     extract_xml_from_llm,

@@ -78,6 +78,21 @@ ACA_DEPLOY_ENV_VARS=(
 )
 otel_aca_append
 
+# Optional metrics signal, independent of the private helper's Loki/Tempo defaults.
+if [[ -n "${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}" ]]; then
+  ACA_DEPLOY_ENV_VARS+=(
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="$OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf
+  )
+  if [[ -n "${OTEL_EXPORTER_OTLP_METRICS_HEADERS:-}" ]]; then
+    ACA_DEPLOY_SECRETS+=(otel-metrics-headers="$OTEL_EXPORTER_OTLP_METRICS_HEADERS")
+    ACA_DEPLOY_ENV_VARS+=(OTEL_EXPORTER_OTLP_METRICS_HEADERS=secretref:otel-metrics-headers)
+  fi
+fi
+if [[ -n "${DIAPASON_OTLP_ENDPOINT_MODE:-}" ]]; then
+  ACA_DEPLOY_ENV_VARS+=(DIAPASON_OTLP_ENDPOINT_MODE="$DIAPASON_OTLP_ENDPOINT_MODE")
+fi
+
 service_deploy_app "$APP_NAME" "$IMAGE_REF" "$TARGET_PORT" AGENT_URL
 unset ACA_DEPLOY_SECRETS ACA_DEPLOY_ENV_VARS
 

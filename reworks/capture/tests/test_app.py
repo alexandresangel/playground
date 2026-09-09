@@ -11,8 +11,8 @@ from cryptography.hazmat.primitives.serialization import BestAvailableEncryption
 from cryptography.x509.oid import NameOID
 from fastapi.testclient import TestClient
 
-from capture.app import create_app
-from capture.security import CaptureSecurity, JwtAuth
+from capture.auth import CaptureSecurity, JwtAuth
+from capture.main import create_app
 
 
 class FakeCatalog:
