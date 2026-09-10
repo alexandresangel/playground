@@ -1,0 +1,71 @@
+{
+  "version": "1",
+  "default_prompt": "prompts/mltLoan.txt",
+  "default_view_entity": "loanDeposit",
+  "default_menu_name": "loanDeposit",
+  "prompts": {
+    "prompts/buyCertificateOfDeposit.txt": {
+      "view_entity": "commercialPaper",
+      "menu_name": "commercialPaper",
+      "types": [
+        "buyCertificateOfDeposit",
+        "issueCertificateOfDeposit",
+        "buyBMTN",
+        "issueBMTN"
+      ]
+    },
+    "prompts/buyDiscountedPaper.txt": {
+      "view_entity": "commercialPaper",
+      "menu_name": "commercialPaper",
+      "types": [
+        "buyDiscountedPaper",
+        "issueDiscountedPaper"
+      ]
+    },
+    "prompts/commercialLeaseClassic.txt": {
+      "view_entity": "loanDeposit",
+      "menu_name": "commercialLease",
+      "types": [
+        "commercialLease"
+      ]
+    },
+    "prompts/discountedDeposit.txt": {
+      "view_entity": "loanDeposit",
+      "menu_name": "loanDeposit",
+      "types": [
+        "discountedDeposit",
+        "dicountedLoan"
+      ]
+    },
+    "prompts/mltLoan.txt": {
+      "view_entity": "loanDeposit",
+      "menu_name": "loanDeposit",
+      "types": [
+        "NDDeposit",
+        "NDLoan",
+        "iamDeposit",
+        "iamLoan",
+        "mltDeposit",
+        "mltDepositPrepaid",
+        "mltLoan",
+        "mltLoanPrepaid",
+        "progressiveTermDeposit",
+        "cumulativeTermDepositInFine",
+        "progressiveTermDepositInFine",
+        "depositDrawing",
+        "depositDrawingPrepaid",
+        "loanDrawing",
+        "loanDrawingPrepaid",
+        "termDeposit"
+      ]
+    },
+    "prompts/mltLoanPerpetual.txt": {
+      "view_entity": "loanDeposit",
+      "menu_name": "loanDeposit",
+      "types": [
+        "mltDepositPerpetual",
+        "mltLoanPerpetual"
+      ]
+    }
+  }
+}

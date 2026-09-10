@@ -1,0 +1,33 @@
+# Company configuration and local verification stay outside the image.
+config.json
+config.example.json
+.env
+.env.*
+*.env
+*.local.*
+*.secret.*
+jwt_keystore*.p12
+data/
+config/
+tests/
+docs/
+*.md
+.pytest-artifacts/
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+*.egg-info/
+**/*.egg-info/
+build/
+dist/
+.venv*/
+venv/
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Use the existing frontend build before packaging static/js.
+frontend/

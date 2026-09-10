@@ -1,0 +1,62 @@
+Analyze the provided financial trade document and generate an XML output following the tradeMoneyMarket schema. Extract only the following key elements if explicitly present in the document:
+
+Essential trade details:
+- Entity (company name which is called the "taker")
+- Counterparty (bank name which is called the "lessor")
+- Trade date
+- Maturity date
+- Currency code
+- Rent amount (reccurent rent amounts)
+
+Payment structure:
+- Frequency (1M, 3M, 6M, 12M, or 'IF' for in fine)
+
+
+Generate XML output using this template:
+
+<tradeMoneyMarket>
+  <entity name="[ENTITY]"/>
+  <cpty name="[COUNTERPARTY]"/>
+  <tradeDate>[TRADE_DATE]</tradeDate>
+  <maturityDate>[MATURITY_DATE]</maturityDate>
+  <currency1 shortname="[CURRENCY]"/>
+  <amount1>[AMOUNT]</amount1>
+  <frequency shortname="[RENT_FREQ]" customDictionaryName="frequency"/>
+</tradeMoneyMarket>
+
+
+Only generate the xml, nothing else. Do not include a <tradeType> element; the application adds it from the user's selection. Only include elements where values are explicitly found in the document. Skip any elements where information is uncertain or missing. Format all dates as ISO 8601 (YYYY-MM-DDTHH:MM:SS.SSSZ).
+If the PDF cannot be parsed (e.g., no extractable text, unreadable/corrupted content, or parsing failure), output exactly the following single-line XML and nothing else:
+<error code="422" reason="UNPARSABLE_DOCUMENT"/>
+
+
+
+*************************************************************
+Specific rules for this trade type to complete the input mask
+
+  - All fields not described below are let empty or initialized by the default values
+
+  - From [ENTITY] we fetch in Configuration/Entities/Entity an active internal entity with a similar name
+  - Once the Internal Entity is found, we fetch in Configuration / Other static data / Folders / Folder the first active folder which has the internal entity found in the previous step
+  - If a match is found, we fill in the field "Taker" with the value found
+     - Else, we let the field "Taker" empty
+  
+  - From [COUNTERPARTY] we fetch in Configuration/Entities/Entity an active entity with option "Counterparty" = True with a similar name
+  - If a match is found, we fill in the field "Lessor" with the value found
+     - Else, we let the field "Lessor" empty
+
+  - Field "Frequency" is filled in with [RENT_FREQ]
+  
+  - Field "Currency" is filled in with [CURRENCY]
+  
+  - Field "Trade date" is filled in with [TRADE_DATE]
+  
+  - Field "Value date" is calculated from the [TRADE_DATE] (during the manual input, the value date takes automatically the value of the trade date)
+  
+  - Field "Maturity date" is filled in with [MATURITY_DATE]
+  
+  - Field "Rent" is filled in with [AMOUNT]
+  
+  - Check box "Fixed" will be forced to TRUE
+
+*************************************************************

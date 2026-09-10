@@ -1,0 +1,2 @@
+# Install this standalone project and the dependencies declared in pyproject.toml.
+-e .

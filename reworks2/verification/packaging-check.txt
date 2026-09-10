@@ -1,0 +1,7 @@
+PASS: fresh isolated builds produced independent diapason_capture and diapason_pascal wheels.
+PASS: each wheel installed with --no-deps into a separate target directory.
+PASS: isolated Python (-I) loaded each installed ASGI entry and exercised health using substituted external startup services.
+PASS: installed dia_jwt/ and locales/ matched every original byte; legacy public module imports resolved from the installed wheel.
+PASS: wheel contents exclude source company/ duplicates, egg-info and tests; imports require no sibling project or source-tree path.
+PASS: Pascal installed static host and i18n endpoints responded; Capture has its dedicated build-health response and no root host page.
+No Docker image, live Azure/Blob/MCP, frontend host integration or ACA deployment was tested.

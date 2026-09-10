@@ -1,0 +1,1 @@
+PASS: compiled 45 Capture and 60 Pascal runtime/test files plus the migration verifier without writing bytecode.

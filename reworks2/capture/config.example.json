@@ -1,0 +1,35 @@
+{
+  "jwt": {
+    "keystore_password": "change-me",
+    "revoked": {
+      "jtis": {},
+      "subs": {}
+    }
+  },
+  "storage": {
+    "account_name": "diapasondevstor",
+    "chat_container": "chat-sessions",
+    "config_container": "agent-config"
+  },
+  "intelligence_contract": {
+    "enabled": false,
+    "catalog_blob": "skills/intelligence-contract/catalog.json",
+    "cache_ttl_seconds": 300,
+    "max_pdf_bytes": 10485760,
+    "view_entity": "loanDeposit",
+    "temperature": 0.5
+  },
+  "azure_openai": {
+    "endpoint": "https://your-resource.openai.azure.com",
+    "api_key": "",
+    "deployment": "your-deployment-name",
+    "api_version": "2024-10-21"
+  },
+  "mcp": {
+    "default": {
+      "label": "Diapason",
+      "server_url": "http://127.0.0.1:8000/mcp",
+      "config_key": "same-fernet-key-as-MCP_CONFIG_KEY-on-mcp-server"
+    }
+  }
+}
