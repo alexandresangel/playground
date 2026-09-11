@@ -1,0 +1,54 @@
+# Tests and local config (not needed in image)
+test/
+config.json
+config.example.json
+test.api.json
+
+# Runtime / deploy (CHAT_CONFIG + JWT_KEYSTORE_P12_B64 at runtime)
+data/
+deploy/
+.github/
+jwt_keystore.p12
+
+# Local-only content
+*.md
+skills/intelligence_contract/config/
+skills/intelligence_contract/data/
+
+# Frontend tooling (build on host/CI before docker; only static/js/ goes in the image)
+frontend/
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+.venv-ci/
+.venv-smoke/
+venv/
+
+# Git / IDE
+.git/
+.gitignore
+.cursor/
+
+# Env files (secrets stay out of image)
+.env
+.env.*
+*.env
+*.local.*
+*.secret.*
+
+# Src packaging and local verification artifacts
+tests/
+config.*.json
+build/
+dist/
+**/*.egg-info/
+.venv-wheel/
+!README.md
+
+**/*.p12
+scripts/test.api.json
+scripts/test.api.*.json

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=78", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diapason-pascal"
+version = "0.1.0"
+description = "LangGraph chat and remote Capture integration"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = ["pascal", "pascal.agent", "pascal.api", "pascal.integrations", "pascal.observability", "dia_jwt", "locales"]
+py-modules = ["auth_setup", "blob_client", "build_info", "i18n", "mcp_context", "mcp_rpc", "prompt_loader", "session_store", "settings", "source_extract", "telemetry", "tool_audience"]
+include-package-data = false
+
+[tool.setuptools.package-dir]
+"" = "src/pascal/commun"
+"pascal" = "src/pascal"
+"dia_jwt" = "src/pascal/commun/dia_jwt"
+"locales" = "src/pascal/commun/locales"
+
+[tool.setuptools.package-data]
+locales = ["*.json"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"

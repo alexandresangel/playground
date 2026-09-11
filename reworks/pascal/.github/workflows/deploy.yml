@@ -1,0 +1,104 @@
+# Deploy: build only to dev; promote the same image tag to test / prod.
+#
+# - workflow_dispatch + environment=dev  → build & push IMAGE_TAG=github.sha, deploy to ACA dev
+# - workflow_dispatch + environment=test → promote IMAGE_TAG (required; usually the SHA from a successful dev deploy)
+# - release published (not draft)         → promote github.sha (commit of the release tag) to prod
+#
+# GitHub Environments: dev | test | prod (Azure + Infisical secrets per env).
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+        default: dev
+      image_tag:
+        description: Registry image tag to promote (git SHA). Required for test; ignored for dev.
+        required: false
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  GITHUB_REGISTRY: containers.diapason.ghe.com
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    environment: ${{ github.event_name == 'release' && 'prod' || inputs.environment }}
+    steps:
+      - name: Resolve deploy target
+        id: target
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == release ]]; then
+            if [[ "${{ github.event.release.draft }}" == true ]]; then
+              echo "error: draft releases do not deploy" >&2
+              exit 1
+            fi
+            echo "env=prod" >>"$GITHUB_OUTPUT"
+            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "skip_build=1" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.environment }}" == test ]]; then
+            tag="${{ inputs.image_tag }}"
+            tag="${tag#"${tag%%[![:space:]]*}"}"
+            tag="${tag%"${tag##*[![:space:]]}"}"
+            if [[ -z "$tag" ]]; then
+              echo "error: image_tag is required when deploying to test (use the git SHA from a successful dev deploy)" >&2
+              exit 1
+            fi
+            echo "env=test" >>"$GITHUB_OUTPUT"
+            echo "image_tag=$tag" >>"$GITHUB_OUTPUT"
+            echo "skip_build=1" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=$tag" >>"$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >>"$GITHUB_OUTPUT"
+            echo "image_tag=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+            echo "skip_build=0" >>"$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ github.sha }}" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.checkout_ref }}
+
+      - uses: actions/setup-node@v7
+        if: steps.target.outputs.skip_build == '0'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: diapason/actions/service-deploy/login-azure@main
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy
+        env:
+          IMAGE_TAG: ${{ steps.target.outputs.image_tag }}
+          SKIP_BUILD: ${{ steps.target.outputs.skip_build }}
+          GITHUB_REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          INFISICAL_URL: ${{ secrets.INFISICAL_URL }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+        run: bash deploy/deploy.sh "${{ steps.target.outputs.env }}"
+
+      - uses: diapason/actions/service-deploy/logout-azure@main
+        if: always()

@@ -1,30 +1,27 @@
-import base64
+from unittest.mock import Mock
 
-import pytest
-
-from capture.workflow.service import CaptureRuntime
-
-
-def _runtime_for_decode(max_bytes: int = 20) -> CaptureRuntime:
-    runtime = object.__new__(CaptureRuntime)
-    runtime.capture_settings = {"max_pdf_bytes": max_bytes}
-    return runtime
+import settings
+from capture import runtime
 
 
-def test_decode_pdf_base64() -> None:
-    runtime = _runtime_for_decode()
-    data = b"%PDF-test"
-    assert runtime.decode_pdf_base64(base64.b64encode(data).decode()) == data
+def test_capture_startup_loads_only_its_catalog_from_service_root(tmp_path, monkeypatch):
+    (tmp_path / "config.json").write_text('{"intelligence_contract": {"enabled": true}}')
+    monkeypatch.delenv("CHAT_CONFIG", raising=False)
+    monkeypatch.setattr(settings, "_config", None)
+    monkeypatch.setattr(runtime, "configure_auth", lambda *args: (None, None, None, None, None))
+    monkeypatch.setattr(runtime, "create_session_store", lambda config: None)
+    monkeypatch.setattr(runtime.telemetry, "init_otel", lambda **kwargs: None)
+    catalog = Mock()
+    monkeypatch.setattr(runtime, "init_capture_prompts", catalog)
+    result = runtime.create_runtime(tmp_path)
+    catalog.assert_called_once_with(result.config)
+    assert not (tmp_path / "system_prompt.md").exists()
 
 
-def test_decode_pdf_data_uri() -> None:
-    runtime = _runtime_for_decode()
-    data = b"%PDF-test"
-    encoded = base64.b64encode(data).decode()
-    assert runtime.decode_pdf_base64(f"data:application/pdf;base64,{encoded}") == data
-
-
-def test_decode_rejects_oversized_input_before_decode() -> None:
-    runtime = _runtime_for_decode(max_bytes=3)
-    with pytest.raises(ValueError, match="max size"):
-        runtime.decode_pdf_base64(base64.b64encode(b"123456789").decode())
+def test_original_azure_constructor_arguments(monkeypatch):
+    constructor = Mock()
+    monkeypatch.setattr(runtime, "AzureOpenAI", constructor)
+    config = {"azure_openai": {"endpoint": "https://same.openai.azure.com", "api_key": "test", "deployment": "same-model", "api_version": "2024-10-21"}}
+    result = runtime.build_azure_client(config)
+    constructor.assert_called_once_with(azure_endpoint="https://same.openai.azure.com", api_key="test", api_version="2024-10-21")
+    assert result == {"client": constructor.return_value, "deployment": "same-model"}

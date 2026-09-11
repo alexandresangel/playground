@@ -1,0 +1,374 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "How to use",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**prod** \u2014 `diapason-agent-prod` / `diapason-mcp-prod` / blob `diapasonprodstor`.\n\nChats table columns come from Loki `chat done` lines (tools per request). Tempo panel lists `chat.completion` spans \u2014 open a TraceID to see agent\u2194MCP. Transcript: `https://diapasonprodstor.blob.core.windows.net/chat-sessions/{scope}/{id}.json`."
+      }
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Chats (tools first \u2014 then tokens / cost)",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{service_name=\"diapason-agent-prod\"} |= `chat done` |~ `customer=${customer_id}` |~ `user=${user_id}` | regexp `customer=(?P<customer>\\S+) user=(?P<user>\\S+) session=(?P<session>\\S+) tokens_in=(?P<tokens_in>\\S*) tokens_out=(?P<tokens_out>\\S*) cost_usd=(?P<cost_usd>\\S*) tools=(?P<tools>\\S*) skills=(?P<skills>\\S*)` | line_format `tools={{.tools}} skills={{.skills}} customer={{.customer}} user={{.user}} tokens_in={{.tokens_in}} tokens_out={{.tokens_out}} cost_usd={{.cost_usd}} session={{.session}}`",
+          "queryType": "range",
+          "refId": "A",
+          "direction": "backward",
+          "maxLines": 100
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "showCommonLabels": false,
+        "prettifyLogMessage": false
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Chat volume",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({service_name=\"diapason-agent-prod\"} |= `chat done` |~ `customer=${customer_id}` |~ `user=${user_id}` [$__interval]))",
+          "queryType": "range",
+          "refId": "A",
+          "legendFormat": "chats"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Estimated cost USD",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (customer) (sum_over_time({service_name=\"diapason-agent-prod\"} |= `chat done` |~ `customer=${customer_id}` |~ `user=${user_id}` | regexp `customer=(?P<customer>\\S+).*cost_usd=(?P<cost>[0-9]+\\.[0-9]+|[1-9][0-9]*)` | unwrap cost [$__interval]))",
+          "queryType": "range",
+          "refId": "A",
+          "legendFormat": "{{customer}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "fillOpacity": 20
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "bargauge",
+      "title": "Tools used on chats (from chat done)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (tools) (count_over_time({service_name=\"diapason-agent-prod\"} |= `chat done` |~ `customer=${customer_id}` |~ `user=${user_id}` | regexp `customer=(?P<customer>\\S+) user=(?P<user>\\S+) session=(?P<session>\\S+) tokens_in=(?P<tokens_in>\\S*) tokens_out=(?P<tokens_out>\\S*) cost_usd=(?P<cost_usd>\\S*) tools=(?P<tools>\\S*) skills=(?P<skills>\\S*)` | tools != `` | tools != `\"\"` [$__range]))",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "displayMode": "gradient",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "bargauge",
+      "title": "MCP tool spans (ok)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (tool) (count_over_time({service_name=\"diapason-mcp-prod\"} |= `tool ` |= ` ok ` | regexp `tool (?P<tool>\\S+) ok` [$__range]))",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "displayMode": "gradient",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "MCP tool failures",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({service_name=\"diapason-mcp-prod\"} |= `tool ` |= `failed` [$__range])) or vector(0)",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "0",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "traces",
+      "title": "chat.completion traces (open TraceID \u2192 MCP children)",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "refId": "A",
+          "limit": 50,
+          "tableType": "traces",
+          "filters": [],
+          "query": "{resource.service.name=\"diapason-agent-prod\" && name=\"chat.completion\"}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "text",
+      "title": "Service graph note",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Tempo **service graph** needs the Tempo metrics-generator (often off in PoC). Use a TraceID from the panel above to see `diapason-agent-prod` \u2192 `diapason-mcp-prod` spans in one trace. After redeploy, identity attrs are strings so TraceQL filters can use `span.diapason.customer_id=~\"\u2026\"` if needed."
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "diapason",
+    "agent",
+    "mcp",
+    "prod"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "customer_id",
+        "type": "textbox",
+        "label": "customer_id",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "options": [
+          {
+            "text": ".*",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "query": ".*"
+      },
+      {
+        "name": "user_id",
+        "type": "textbox",
+        "label": "user_id",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "options": [
+          {
+            "text": ".*",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "query": ".*"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Diapason Agent+MCP \u2014 prod",
+  "uid": "diapason-agent-mcp-prod",
+  "version": 2
+}

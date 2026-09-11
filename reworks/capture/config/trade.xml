@@ -1,0 +1,16 @@
+<tradeMoneyMarket>
+  <tradeType shortname="iamLoan">763</tradeType>
+  <tradeDate class="sql-timestamp">2023-07-13T00:00:00.000Z</tradeDate>
+  <currency1 shortname="EUR">879</currency1>
+  <amount1>2.2763E+7</amount1>
+  <basis shortname="ACT/365">8</basis>
+  <rate shortname="EURIBOR3M">46</rate>
+  <firstCouponDate class="sql-timestamp">2023-09-30T00:00:00.000Z</firstCouponDate>
+  <firstAmortizationDate class="sql-timestamp">2026-09-06T00:00:00.000Z</firstAmortizationDate>
+  <maturityDate class="sql-timestamp">2026-09-06T00:00:00.000Z</maturityDate>
+  <isFixed>false</isFixed>
+  <spread>0.0</spread>
+  <frequency shortname="3M">255</frequency>
+  <principalFrequency shortname="IF">252</principalFrequency>
+  <amortizationType shortname="IF">247</amortizationType>
+</tradeMoneyMarket>

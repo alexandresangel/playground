@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Unit and contract tests
+        run: python -m pytest -q
+
+      - name: Build Python wheel
+        run: python -m build --wheel
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build original frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Build standalone container
+        run: docker build -t pascal:ci .
