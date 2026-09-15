@@ -1,10 +1,12 @@
 """api: auth: company HTTP behavior with explicit runtime dependencies."""
 
 from __future__ import annotations
-from capture.api.schemas import MintTokenBody, RevokeTokenBody
-from capture.runtime import Runtime
+
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Any, Dict
+
+from capture.api.schemas import MintTokenBody, RevokeTokenBody
+from capture.runtime import Runtime
 
 
 def create_router(runtime: Runtime) -> APIRouter:

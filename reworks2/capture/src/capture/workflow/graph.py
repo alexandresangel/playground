@@ -1,20 +1,19 @@
 """Capture: validate -> extract XML -> resolve references -> shape result.
-
-Node order, duplicate catalog lookup, MCP call and result fields follow the original.
-Inputs remain transient; there is no checkpointer or external graph tracing.
+There is no checkpointer or external graph tracing yet
 """
 
-from capture.workflow.extract_xml import extract_trade_xml_detail, validate_pdf_bytes
-from capture.workflow.prompts import capture_config, get_trade_type_config
-from capture.workflow.xml_fields import count_extracted_fields
 from langgraph.graph import END, START, StateGraph
-from mcp_context import McpCluster
-from mcp_rpc import mcp_call_tool_json
 from typing import Any, TypedDict
-from capture.observability.ai import ai_span, private_graph_run
 import asyncio
 import logging
 import time
+
+from mcp_context import McpCluster
+from mcp_rpc import mcp_call_tool_json
+from capture.workflow.extract_xml import extract_trade_xml_detail, validate_pdf_bytes
+from capture.workflow.prompts import capture_config, get_trade_type_config
+from capture.workflow.xml_fields import count_extracted_fields
+from capture.observability.ai import ai_span, private_graph_run
 
 log = logging.getLogger("diapason.chat.ic")  # Existing company logger destination.
 
@@ -63,8 +62,8 @@ def create_capture_graph(*, cluster: McpCluster, config: dict, azure: dict, debu
     async def resolve(state: CaptureState) -> dict:
         with ai_span("ai.capture.tool"):
             started = time.perf_counter()
-            body = mcp_call_tool_json(
-                cluster.diapason, "resolveReferences",
+            body = await asyncio.to_thread(
+                mcp_call_tool_json, cluster.diapason, "resolveReferences",
                 {"view_entity": state["view_entity"], "trade_xml": state["extract"]["trade_xml"]},
                 timeout_s=180.0,
             )

@@ -1,10 +1,18 @@
-"""Content-free AI spans on the existing company OpenTelemetry provider."""
+"""Content-free AI spans."""
 
 from contextlib import contextmanager, nullcontext
-from langsmith import tracing_context
 from opentelemetry.trace import Status, StatusCode
-from telemetry import get_tracer
 from time import perf_counter
+
+from telemetry import get_tracer
+
+
+@contextmanager
+def private_graph_run():
+    """Keep graph inputs out of automatic LangSmith tracing, even when env-enabled."""
+    from langsmith import tracing_context
+    with tracing_context(enabled=False):
+        yield
 
 
 @contextmanager
@@ -36,10 +44,3 @@ def record_usage(span, usage: dict) -> None:
             value = usage.get(key)
             if isinstance(value, int) and not isinstance(value, bool):
                 span.set_attribute(f"gen_ai.usage.{key}_tokens", value)
-
-
-@contextmanager
-def private_graph_run():
-    """Prevent automatic LangSmith export of graph inputs/state, even if enabled by env."""
-    with tracing_context(enabled=False):
-        yield

@@ -1,14 +1,16 @@
 """Extract trade XML from PDF text via Azure OpenAI."""
 
 from __future__ import annotations
-from capture.workflow.prompts import get_prompt_text, get_trade_type_config, capture_temperature
+
 from pypdf import PdfReader
-from telemetry import usage_from_completion
 from typing import Any, Dict
-from capture.observability.ai import ai_span, record_usage
 import io
 import re
 import xml.etree.ElementTree as ET
+
+from telemetry import usage_from_completion
+from capture.workflow.prompts import get_prompt_text, get_trade_type_config, capture_temperature
+from capture.observability.ai import ai_span, record_usage
 
 _PDF_PREVIEW_CHARS = 2000
 

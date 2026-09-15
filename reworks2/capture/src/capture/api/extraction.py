@@ -1,17 +1,20 @@
 """Existing extraction HTTP contract and its session-persistence adapter."""
 
 from __future__ import annotations
+
+from contextlib import nullcontext
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
+from typing import Any, Dict, Optional
+
+from dia_jwt.fastapi import Identity
+from i18n import strings_for_locale, translate
 from capture.observability.http import record_capture_result
 from capture.workflow.prompts import capture_enabled, capture_prompt_version, capture_trade_types
 from capture.runtime import Runtime, _resolve_session_id, _session_store_error, locale_from_request
 from capture.workflow.graph import run_capture
-from contextlib import nullcontext
-from dia_jwt.fastapi import Identity
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
-from i18n import strings_for_locale, translate
-from starlette.responses import Response
-from typing import Any, Dict, Optional
+
 
 CHAT_SESSION_HEADER = "X-Diapason-Chat-Session"
 

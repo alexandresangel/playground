@@ -1,11 +1,10 @@
-"""Capture's API-only workflow service; no chat application or frontend startup."""
-
-from capture.api import auth, extraction, health, middleware
-from capture.runtime import Runtime, create_runtime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+
 import build_info
+from capture.api import auth, extraction, health, middleware
+from capture.runtime import Runtime, create_runtime
 
 
 def create_app(base_dir: Path, *, runtime: Runtime | None = None) -> FastAPI:
@@ -15,8 +14,11 @@ def create_app(base_dir: Path, *, runtime: Runtime | None = None) -> FastAPI:
     app.state.runtime = runtime
     middleware.configure_middleware(app, runtime)
     app.add_middleware(
-        CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-        allow_methods=["*"], allow_headers=["*"],
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     for module in (health, auth, extraction):
         app.include_router(module.create_router(runtime))

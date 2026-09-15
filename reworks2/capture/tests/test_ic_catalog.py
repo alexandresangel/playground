@@ -5,9 +5,8 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import capture.workflow.prompts as capture_prompts  # noqa: E402
+from capture.workflow import prompts as ic_prompt_loader  # noqa: E402
 from capture.workflow.prompts import get_trade_type_config  # noqa: E402
 
 
@@ -22,8 +21,8 @@ class IcCatalogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-        capture_prompts._catalog.clear()
-        capture_prompts._catalog.update(catalog)
+        ic_prompt_loader._catalog.clear()
+        ic_prompt_loader._catalog.update(catalog)
 
     def test_explicit_trade_type(self) -> None:
         cfg = get_trade_type_config("buyDiscountedPaper")

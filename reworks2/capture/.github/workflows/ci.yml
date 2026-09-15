@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          run: pip install -r requirements-dev.txt
+
+      - name: Unit tests
+        run: |
+          pytest test/ -v \
+            --ignore=test/test_agent_smoke.py \
+            --ignore=test/test_tool_route.py \
+            --ignore=test/test_source_extract.py

@@ -1,101 +1,74 @@
-"""Offline app bootstrap: real company JWT; only Blob/model/network are substituted."""
-
-import importlib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from cryptography.fernet import Fernet
+from fastapi.testclient import TestClient
 
-PROJECT = Path(__file__).resolve().parents[1]
-
-import auth_setup
-import session_store
 import settings
 from dia_jwt import JwtAuth
 from dia_jwt.fastapi import jwt_deps
+from session_store import _add_turns, turns_for_client
+from capture.application import create_app
+from capture.runtime import Runtime
 
 
 class MemorySessions:
-    """Test double at the unchanged storage interface, not a delivered memory backend."""
-    backend = "test"
+    """Test storage using the original record/turn helpers, with strict scope lookup."""
+    backend = "test-memory"
 
     def __init__(self):
         self.records = {}
-        self.appended = []
+        self.writes = []
 
-    def create_session(self, scope, title=""):
+    def create_session(self, scope):
         sid = f"session-{len(self.records) + 1}"
-        record = {"session_id": sid, "scope": scope, "created_at": "2026-01-01", "updated_at": "2026-01-01", "turns": []}
-        self.records[(scope, sid)] = record
+        record = dict(session_id=sid, created_at="now", updated_at="now", turns=[])
+        self.records[scope, sid] = record
         return record
 
-    def resolve_session_id(self, scope, session_id):
-        if session_id:
-            if (scope, session_id) not in self.records:
-                raise KeyError(session_id)
-            return session_id
+    def get_session(self, sid, scope):
+        return self.records.get((scope, sid))
+
+    def resolve_session_id(self, scope, sid):
+        if sid:
+            if (scope, sid) not in self.records:
+                raise KeyError(sid)
+            return sid
         return self.create_session(scope)["session_id"]
 
-    def get_session(self, session_id, scope):
-        return self.records.get((scope, session_id))
+    def append_turn(self, sid, scope, user, assistant, **kwargs):
+        record = self.records[scope, sid]
+        _add_turns(record, user, assistant, 30, **kwargs)
+        self.writes.append((sid, scope, kwargs))
 
-    def get_turns(self, session_id, scope):
-        return self.records[(scope, session_id)]["turns"]
-
-    def append_turn(self, session_id, scope, user, assistant, **kwargs):
-        self.appended.append((session_id, scope, user, assistant, kwargs))
-        self.records[(scope, session_id)]["turns"].extend([
-            {"role": "user", "content": user}, {"role": "assistant", "content": assistant},
-        ])
+    def get_turns(self, sid, scope):
+        return turns_for_client(self.records[scope, sid]["turns"])
 
     def list_sessions(self, scope):
-        return [v for (s, _), v in self.records.items() if s == scope]
+        return [record for (owner, _), record in self.records.items() if owner == scope]
 
-    def delete_session(self, session_id, scope):
-        return self.records.pop((scope, session_id), None) is not None
+    def delete_session(self, sid, scope):
+        return self.records.pop((scope, sid), None) is not None
 
 
-def pytest_configure(config):
-    # Keep all test keys, caches and temporary files inside this standalone project.
-    artifacts = PROJECT / ".pytest-artifacts"
-    artifacts.mkdir(exist_ok=True)
-    config.option.basetemp = str(artifacts / "tmp")
-    key = Fernet.generate_key().decode()
-    cfg = {"intelligence_contract": {"enabled": False}, "azure_openai": {},
-           "storage": {}, "mcp": {"default": {"server_url": "https://mcp.test/mcp", "config_key": key}},
-           "ui": {}, "sessions": {}}
-    auth = JwtAuth.create_keystore(artifacts / "test.p12", "test-only", revocation_path=artifacts / "revoked.json")
-    if auth._revoked_path.exists():
-        auth._revoked_path.unlink()
+@pytest.fixture
+def service(tmp_path, monkeypatch):
+    auth = JwtAuth.create_keystore(tmp_path / "key.p12", "offline-test", revocation_path=tmp_path / "revoked.json")
+    config = {
+        "intelligence_contract": {"enabled": True},
+        "mcp": {"default": {"server_url": "https://mcp.example/mcp", "config_key": Fernet.generate_key().decode()}},
+    }
+    monkeypatch.setattr(settings, "_config", config)
     deps = jwt_deps(auth)
-    configured = (auth, deps["get_identity"], deps["require_admin"], deps["require_refresh"], deps["require_chat"])
-    settings._config = cfg
-    from capture.runtime import Runtime
-    from capture.application import create_app
-    services = Runtime(PROJECT, cfg, auth, deps["get_identity"], deps["require_admin"],
-                       deps["require_refresh"], deps["require_chat"], MemorySessions())
-    app = create_app(PROJECT, runtime=services)
-    capture_routes = importlib.import_module("capture.api.extraction")
-    config._offline = SimpleNamespace(app=app, runtime=services, auth=auth, cfg=cfg, key=key,
-        configured=configured, capture_routes=capture_routes, profile="capture")
-
-
-
-@pytest.fixture
-def offline(request, monkeypatch):
-    runtime = request.config._offline
-    sessions = MemorySessions()
-    monkeypatch.setattr(runtime.runtime, "sessions", sessions)
-    monkeypatch.setitem(runtime.cfg["intelligence_contract"], "enabled", False)
-    monkeypatch.setitem(runtime.cfg, "azure_openai", {})
-    runtime.sessions = sessions
-    return runtime
-
-
-@pytest.fixture
-def headers(offline):
-    token = offline.auth.mint(sub="instance:test", roles=["chat"], customer_id=7)["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Diapason-User-Id": "9", "X-Diapason-Customer-Id": "7",
-            "X-Diapason-Mcp-Token": "user-specific-api-token", "X-Diapason-Mcp-Scope": "12",
-            "X-Diapason-Mcp-Base-Url": "https://company.test/diapason"}
+    runtime = Runtime(Path(__file__).resolve().parents[1], config, auth, sessions=MemorySessions(), **deps)
+    app = create_app(runtime.base_dir, runtime=runtime)
+    token = auth.mint(sub="instance:demo", roles=["chat"], customer_id=7)
+    headers = {
+        "Authorization": "Bearer " + token["access_token"],
+        "X-Diapason-User-Id": "42", "X-Diapason-Customer-Id": "7",
+        "X-Diapason-Mcp-Token": "private-api-token", "X-Diapason-Mcp-Scope": "3",
+        "X-Diapason-Mcp-Base-Url": "https://company.example", "X-Diapason-Locale": "fr_FR",
+    }
+    with TestClient(app) as client:
+        yield SimpleNamespace(runtime=runtime, app=app, client=client, headers=headers, token=token, scope="demo/7/42")

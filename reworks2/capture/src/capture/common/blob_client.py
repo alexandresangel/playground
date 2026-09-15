@@ -14,6 +14,22 @@ def connect_blob(account_name: str, container: str) -> tuple[object, object, str
     from azure.identity import AzureCliCredential, DefaultAzureCredential
     from azure.storage.blob import BlobServiceClient
 
+    # Explicit alternative transport (e.g. Azurite). The default Azure identity
+    # path below is unchanged when no connection string is configured.
+    from settings import load_config
+
+    storage = load_config().get("storage") or {}
+    connection_string = str(storage.get("connection_string") or "").strip()
+    if connection_string:
+        options = {}
+        if storage.get("api_version"):
+            options["api_version"] = str(storage["api_version"])
+        client = BlobServiceClient.from_connection_string(connection_string, **options)
+        if client.account_name != account_name.strip():
+            client.close()
+            raise ValueError("storage.account_name does not match storage.connection_string")
+        return client, client.get_container_client(container), "connection-string"
+
     url = f"https://{account_name.strip()}.blob.core.windows.net"
     failures: list[str] = []
 

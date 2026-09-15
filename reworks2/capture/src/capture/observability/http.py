@@ -1,9 +1,11 @@
 """Capture correlation on the existing company provider; never log document content."""
 
-from capture.runtime import Runtime
-from telemetry import session_blob_path, session_blob_url
 from typing import Any, Optional
 import logging
+
+from telemetry import session_blob_path, session_blob_url
+from capture.runtime import Runtime
+
 
 def _set_span_attr(span: Any, key: str, value: Any) -> None:
     if span is None or value is None:

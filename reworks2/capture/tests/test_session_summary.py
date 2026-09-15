@@ -6,7 +6,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from session_store import _add_turns, _has_assistant_response, _normalize_tool_trace, _summary, turns_for_client
 

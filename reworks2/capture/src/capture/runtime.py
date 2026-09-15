@@ -1,24 +1,20 @@
-"""Composition of existing company services; no workflow or HTTP business logic."""
-
 from __future__ import annotations
-from auth_setup import configure_auth
-from capture.workflow.prompts import capture_enabled, init_capture_prompts
+
 from dataclasses import dataclass
 from fastapi import HTTPException, Request
-from i18n import LOCALE_HEADER, locale_from_header_value
 from pathlib import Path
-from session_store import create_session_store
-from settings import load_config
 from typing import Any, Callable, Dict, Optional
-import build_info
 import logging
 import sys
-import telemetry
+from openai import AzureOpenAI
 
-try:
-    from openai import AzureOpenAI
-except ImportError:
-    AzureOpenAI = None
+import telemetry
+from session_store import create_session_store
+from settings import load_config
+from i18n import LOCALE_HEADER, locale_from_header_value
+from auth_setup import configure_auth
+import build_info
+from capture.workflow.prompts import capture_enabled, init_capture_prompts
 
 log = logging.getLogger("diapason.chat")
 

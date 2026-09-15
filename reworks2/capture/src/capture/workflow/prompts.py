@@ -1,12 +1,13 @@
 """Capture prompts using the existing company config blob paths."""
 
 from __future__ import annotations
-from blob_client import read_blob_text
 from typing import Any, Dict, Tuple
 import hashlib
 import json
 import threading
 import time
+
+from blob_client import read_blob_text
 
 LEGACY_BLOB_PREFIX = "skills/intelligence-contract"
 DEFAULT_CATALOG_BLOB = f"{LEGACY_BLOB_PREFIX}/catalog.json"
@@ -16,7 +17,6 @@ _catalog: Dict[str, Any] = {}
 _catalog_version = ""
 _catalog_source = ""
 _prompt_cache: Dict[str, Tuple[float, str]] = {}
-
 
 def capture_config(config: Dict[str, Any]) -> Dict[str, Any]:
     block = config.get("intelligence_contract")
@@ -80,7 +80,7 @@ def _blob_source(config: Dict[str, Any], blob_name: str) -> str:
     return f"blob:{_config_container(config)}/{blob_name}"
 
 
-def _catalog_version(catalog: Dict[str, Any], raw_text: str) -> str:
+def _compute_catalog_version(catalog: Dict[str, Any], raw_text: str) -> str:
     explicit = str(catalog.get("version", "") or catalog.get("catalog_version", "") or "").strip()
     if explicit:
         return explicit
@@ -97,7 +97,7 @@ def _load_catalog(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
     catalog = json.loads(raw)
     if not isinstance(catalog, dict):
         raise RuntimeError(f"{blob_name} must be a JSON object")
-    version = _catalog_version(catalog, raw)
+    version = _compute_catalog_version(catalog, raw)
     source = _blob_source(config, blob_name)
     return catalog, version, source
 

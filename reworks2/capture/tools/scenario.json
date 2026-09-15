@@ -1,0 +1,18 @@
+{
+  "llm": {
+    "response_file": "tools/fixtures/loan.xml",
+    "http_status": 200,
+    "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+  },
+  "mcp": {
+    "http_status": 200,
+    "is_error": false,
+    "reference_ids": {
+      "tradeType": {"iamLoan": "763", "mltLoan": "764"},
+      "currency1": {"EUR": "879"},
+      "basis": {"ACT/365": "8"},
+      "rate": {"EURIBOR3M": "46"}
+    },
+    "response": {"success": true, "message": "Offline fixture: references are synthetic.", "warnings": []}
+  }
+}

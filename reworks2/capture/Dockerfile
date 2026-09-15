@@ -9,12 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml requirements.txt VERSION ./
-COPY src/ ./src/
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Frontend: run `cd frontend && npm ci && npm run build` before docker build (→ static/js/).
 # Runtime secrets: CHAT_CONFIG + JWT_KEYSTORE_P12_B64 (not baked into the image).
 COPY . .
+# Reads pyproject.toml to install capture
+RUN pip install --no-cache-dir --no-deps .
 RUN mkdir -p data
 RUN printf '%s\n' "{\"version\":\"${APP_VERSION}\",\"revision\":\"${GIT_REVISION}\"}" \
     > /app/build-info.json
