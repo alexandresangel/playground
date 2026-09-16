@@ -22,8 +22,8 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http",
     "opentelemetry-instrumentation-logging",
     "langgraph>=1.2.4,<2",
-    "langsmith",
-    "starlette",
+    # "langsmith",
+    # "starlette",
 ]
 
 [dependency-groups]
@@ -31,9 +31,6 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
 ]
-
-[tool.uv]
-required-version = ">=0.12.15"
 
 [tool.setuptools]
 packages = ["capture", "capture.api", "capture.observability", "capture.workflow", "dia_jwt", "locales"]

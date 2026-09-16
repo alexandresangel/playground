@@ -1,4 +1,4 @@
-"""Capture catalog and prompts from the project's bundled config directory."""
+"""Capture catalog and prompts from the project's config folder."""
 
 from __future__ import annotations
 from typing import Any, Dict, Tuple
@@ -8,6 +8,7 @@ import json
 import threading
 import time
 
+
 _lock = threading.Lock()
 _config_dir = Path.cwd() / "config"
 _catalog: Dict[str, Any] = {}
@@ -16,7 +17,6 @@ _catalog_source = ""
 _prompt_cache: Dict[str, Tuple[float, str]] = {}
 
 def capture_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    # Existing CHAT_CONFIG deployments can migrate without a coordinated rollout.
     block = config.get("capture", config.get("intelligence_contract"))
     return block if isinstance(block, dict) else {}
 

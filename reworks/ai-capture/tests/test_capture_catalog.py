@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import json
-import sys
 import unittest
 from pathlib import Path
 

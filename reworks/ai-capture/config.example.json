@@ -1,10 +1,7 @@
 {
   "jwt": {
     "keystore_password": "change-me",
-    "revoked": {
-      "jtis": {},
-      "subs": {}
-    }
+    "revoked": { "jtis": {}, "subs": {} }
   },
   "capture": {
     "enabled": true,
@@ -22,7 +19,7 @@
   "mcp": {
     "default": {
       "label": "Diapason",
-      "server_url": "http://127.0.0.1:8001/mcp",
+      "server_url": "http://127.0.0.1:8000/mcp",
       "config_key": "same-fernet-key-as-MCP_CONFIG_KEY-on-mcp-server"
     }
   }

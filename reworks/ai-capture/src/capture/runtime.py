@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 import logging
@@ -83,4 +84,3 @@ def build_azure_client(config: dict) -> Optional[Dict[str, Any]]:
         ),
         "deployment": deployment,
     }
-

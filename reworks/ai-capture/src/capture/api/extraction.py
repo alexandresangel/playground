@@ -1,4 +1,4 @@
-"""Stateless extraction HTTP contract; Pascal owns chat history."""
+"""Stateless extraction HTTP contract."""
 
 from __future__ import annotations
 

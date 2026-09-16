@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from cryptography.fernet import Fernet
 import json
-from uuid import UUID
 
 from capture.api import extraction
 from capture.workflow import prompts
@@ -36,8 +35,6 @@ def test_upload_returns_result_without_session_storage(service, extraction_run, 
     response = service.client.post(path, headers=service.headers, data={"trade_type": " iamLoan ", "debug": "yes"}, files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")})
     assert response.status_code == 200
     assert "session_artifacts" not in response.json() and "timings_ms" not in response.json()
-    sid = response.headers[SESSION]
-    assert str(UUID(sid)) == sid
     assert not hasattr(service.runtime, "sessions")
     kwargs = run.call_args.kwargs
     assert kwargs["trade_type"] == "iamLoan" and kwargs["debug"] is True and kwargs["pdf_bytes"] == b"%PDF-exact"

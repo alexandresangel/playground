@@ -2,7 +2,6 @@
 tests/
 config.json
 config.example.json
-config.*.json
 test.api.json
 
 # Runtime / deploy (CHAT_CONFIG + JWT_KEYSTORE_P12_B64 at runtime)
@@ -21,7 +20,6 @@ jwt_keystore.p12
 build/
 dist/
 *.egg-info/
-.validation/
 __pycache__/
 *.py[cod]
 *$py.class

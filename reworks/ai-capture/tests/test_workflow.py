@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from capture.workflow import extract_xml, graph, prompts
+from capture.workflow import graph, prompts
 from mcp_context import McpCluster, McpServerContext
 
 PDF = Path(__file__).parent / "fixtures/sample-loan-contract.pdf"

@@ -215,6 +215,20 @@ def query_preview(text: str, max_chars: int = QUERY_PREVIEW_MAX) -> str:
     return s[: max_chars - 1] + "…"
 
 
+def session_blob_path(scope: str, session_id: str) -> str:
+    return f"{scope}/{session_id}.json"
+
+
+def session_blob_url(config: dict, scope: str, session_id: str) -> str:
+    storage = config.get("storage") if isinstance(config.get("storage"), dict) else {}
+    account = str(storage.get("account_name", "") or "").strip()
+    container = str(storage.get("chat_container", "") or "").strip() or "chat-sessions"
+    path = session_blob_path(scope, session_id)
+    if not account:
+        return path
+    return f"https://{account}.blob.core.windows.net/{container}/{path}"
+
+
 def usage_from_completion(response: object) -> dict:
     """Normalize Azure/OpenAI usage object → {input, output, total} ints."""
     usage = getattr(response, "usage", None)

@@ -37,9 +37,31 @@ infisical_export_many_at "${INFISICAL_SHARED_SECRET_PATH:-/}" GHCR_TOKEN
 infisical_export_many_optional_at "${INFISICAL_SHARED_SECRET_PATH:-/}" GHCR_USERNAME
 registry_prepare
 
-terraform_ensure_infra "$ROOT/deploy"
+STORAGE_ACCOUNT_NAME="${STORAGE_ACCOUNT_NAME:-$(jq -r '.storage.account_name // empty' <<<"$CHAT_CONFIG")}"
+CHAT_BLOB_CONTAINER="${CHAT_BLOB_CONTAINER:-$(jq -r '.storage.chat_container // "chat-sessions"' <<<"$CHAT_CONFIG")}"
+CONFIG_BLOB_CONTAINER="${CONFIG_BLOB_CONTAINER:-$(jq -r '.storage.config_container // "agent-config"' <<<"$CHAT_CONFIG")}"
+[[ -n "$STORAGE_ACCOUNT_NAME" ]] || {
+  echo "error: set STORAGE_ACCOUNT_NAME or CHAT_CONFIG.storage.account_name for terraform" >&2
+  exit 1
+}
+export STORAGE_ACCOUNT_NAME
+terraform_ensure_infra "$ROOT/deploy" \
+  -var="storage_account_name=$STORAGE_ACCOUNT_NAME" \
+  -var="chat_blob_container=$CHAT_BLOB_CONTAINER" \
+  -var="config_blob_container=$CONFIG_BLOB_CONTAINER"
 
 [[ "${TERRAFORM_PLAN:-}" == 1 ]] && { log "plan only — done"; exit 0; }
+
+if [[ "${SKIP_BUILD:-}" != 1 ]]; then
+  log "frontend build → static/js/"
+  (
+    cd "$ROOT/frontend"
+    npm ci
+    npm run build
+  )
+  [[ -f "$ROOT/static/js/vendor.bundle.js" && -f "$ROOT/static/js/chat-app.js" && -f "$ROOT/static/js/boot.js" ]] \
+    || { echo "error: frontend build missing static/js/*.js" >&2; exit 1; }
+fi
 
 # SKIP_BUILD=1 → promote existing IMAGE_TAG (registry_require_image); else build & push.
 service_build_push "$ROOT/Dockerfile" "$ROOT"
@@ -72,4 +94,7 @@ fi
 
 wait_aca_health "$AGENT_URL"
 assert_aca_image_tag
-log "deployment health and image checks passed"
+infisical_export_many SMOKE_API_CONFIG
+log "smoke API $AGENT_URL"
+with_python_venv "$ROOT" "$ROOT/requirements.txt" test/test_agent_smoke.py
+log "smoke passed"
