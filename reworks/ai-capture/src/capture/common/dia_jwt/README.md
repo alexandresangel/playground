@@ -2,11 +2,13 @@
 
 Small RS256 JWT helper (PKCS#12, mint, validate, revoke). Copy this folder into other Python projects.
 
+From the Capture project root:
+
 ```bash
-pip install pyjwt cryptography
+uv sync --locked
 export JWT_KEYSTORE_PASSWORD='…'
-python3 -m dia_jwt create-keystore --path jwt_keystore.p12
-python3 -m dia_jwt mint --sub instance:prod --role chat --days 365
+uv run --locked python -m dia_jwt create-keystore --path jwt_keystore.p12
+uv run --locked python -m dia_jwt mint --sub instance:prod --role chat --days 365
 ```
 
 ```python

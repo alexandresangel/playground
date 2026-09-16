@@ -26,7 +26,7 @@ def workflow(monkeypatch):
     client = NS(chat=NS(completions=NS(create=completion)))
     resolver = Mock(return_value={"success": True, "trade_xml": '<trade><tradeType shortname="iamLoan"/><amount>123</amount></trade>', "warnings": ["review"]})
     monkeypatch.setattr(graph, "mcp_call_tool_json", resolver)
-    config = {"intelligence_contract": {"temperature": 0.5}}
+    config = {"capture": {"temperature": 0.5}}
     cluster = McpCluster((McpServerContext("default", "Diapason", "https://mcp.example", {"Authorization": "caller"}),))
     return NS(config=config, cluster=cluster, azure={"client": client, "deployment": "same-model"}, completion=completion, resolver=resolver)
 
@@ -55,7 +55,7 @@ def test_pdf_to_xml_and_original_resolver_contract(workflow):
 
 @pytest.mark.parametrize("pdf,error", [(b"", "empty"), (b"not pdf", "not a PDF"), (b"%PDF-" + b"x" * 50, "max size")])
 def test_validation_precedes_catalog_and_model(workflow, pdf, error, monkeypatch):
-    workflow.config["intelligence_contract"]["max_pdf_bytes"] = 20
+    workflow.config["capture"]["max_pdf_bytes"] = 20
     lookup = Mock(side_effect=AssertionError("catalog should not be read"))
     monkeypatch.setattr(graph, "get_trade_type_config", lookup)
     with pytest.raises(ValueError, match=error):

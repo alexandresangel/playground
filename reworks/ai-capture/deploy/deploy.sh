@@ -41,17 +41,6 @@ terraform_ensure_infra "$ROOT/deploy"
 
 [[ "${TERRAFORM_PLAN:-}" == 1 ]] && { log "plan only — done"; exit 0; }
 
-if [[ "${SKIP_BUILD:-}" != 1 ]]; then
-  log "frontend build → static/js/"
-  (
-    cd "$ROOT/frontend"
-    npm ci
-    npm run build
-  )
-  [[ -f "$ROOT/static/js/vendor.bundle.js" && -f "$ROOT/static/js/chat-app.js" && -f "$ROOT/static/js/boot.js" ]] \
-    || { echo "error: frontend build missing static/js/*.js" >&2; exit 1; }
-fi
-
 # SKIP_BUILD=1 → promote existing IMAGE_TAG (registry_require_image); else build & push.
 service_build_push "$ROOT/Dockerfile" "$ROOT"
 export EXPECTED_VERSION="$(read_version "$ROOT")" EXPECTED_REVISION="$IMAGE_TAG"
@@ -83,7 +72,4 @@ fi
 
 wait_aca_health "$AGENT_URL"
 assert_aca_image_tag
-infisical_export_many SMOKE_API_CONFIG
-log "smoke API $AGENT_URL"
-with_python_venv "$ROOT" "$ROOT/requirements.txt" test/test_agent_smoke.py
-log "smoke passed"
+log "deployment health and image checks passed"

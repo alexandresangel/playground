@@ -1,21 +1,13 @@
 {
   "jwt": {
     "keystore_password": "change-me",
-    "revoked": { "jtis": {}, "subs": {} }
+    "revoked": {
+      "jtis": {},
+      "subs": {}
+    }
   },
-  "ui": {
-    "assistant_name": "Pascal",
-    "assistant_identity": "You are Pascal, the Diapason treasury assistant in this chat. You are named after Pascal Kravitzch, founder of Diapason. Introduce yourself as Pascal when appropriate; stay professional and product-focused.",
-    "mention_exclude_tools": [
-      "getMcpServerVersion",
-      "getDiapasonVersion"
-    ]
-  },
-  "context": {
-    "timezone": "UTC"
-  },
-  "intelligence_contract": {
-    "enabled": false,
+  "capture": {
+    "enabled": true,
     "cache_ttl_seconds": 300,
     "max_pdf_bytes": 10485760,
     "view_entity": "loanDeposit",
@@ -25,33 +17,13 @@
     "endpoint": "https://your-resource.openai.azure.com",
     "api_key": "",
     "deployment": "your-deployment-name",
-    "api_version": "2024-10-21",
-    "max_tool_rounds": 4,
-    "input_usd_per_1m": 0.75,
-    "output_usd_per_1m": 4.50
+    "api_version": "2024-10-21"
   },
   "mcp": {
     "default": {
       "label": "Diapason",
-      "server_url": "http://127.0.0.1:8000/mcp",
+      "server_url": "http://127.0.0.1:8001/mcp",
       "config_key": "same-fernet-key-as-MCP_CONFIG_KEY-on-mcp-server"
-    },
-    "docs": {
-      "label": "Docs",
-      "server_url": "http://127.0.0.1:8020/mcp",
-      "headers": {
-        "Authorization": "Bearer your-docs-mcp-token"
-      },
-      "timeout_s": 300,
-      "enabled": false
-    },
-    "defthedge": {
-      "label": "DeftHedge",
-      "server_url": "http://127.0.0.1:8030/mcp",
-      "headers": {
-        "Authorization": "Bearer your-defthedge-mcp-token"
-      },
-      "enabled": false
     }
   }
 }

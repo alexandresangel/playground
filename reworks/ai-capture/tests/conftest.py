@@ -16,7 +16,7 @@ from capture.runtime import Runtime
 def service(tmp_path, monkeypatch):
     auth = JwtAuth.create_keystore(tmp_path / "key.p12", "offline-test", revocation_path=tmp_path / "revoked.json")
     config = {
-        "intelligence_contract": {"enabled": True},
+        "capture": {"enabled": True},
         "mcp": {"default": {"server_url": "https://mcp.example/mcp", "config_key": Fernet.generate_key().decode()}},
     }
     monkeypatch.setattr(settings, "_config", config)

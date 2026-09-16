@@ -7,7 +7,33 @@ name = "ai-capture"
 version = "0.1.11"
 description = "Extraction service as LangGraph workflow"
 requires-python = ">=3.12"
-dynamic = ["dependencies"]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.8.0",
+    "python-multipart>=0.0.9",
+    "openai>=1.42.0",
+    "httpx>=0.27.0",
+    "pyjwt>=2.8.0",
+    "cryptography>=42.0.0",
+    "pypdf>=6.16.1",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-instrumentation-logging",
+    "langgraph>=1.2.4,<2",
+    "langsmith",
+    "starlette",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.uv]
+required-version = ">=0.12.15"
 
 [tool.setuptools]
 packages = ["capture", "capture.api", "capture.observability", "capture.workflow", "dia_jwt", "locales"]
@@ -22,9 +48,6 @@ include-package-data = false
 
 [tool.setuptools.package-data]
 locales = ["*.json"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -7,7 +7,7 @@ from capture.workflow import prompts
 
 
 def test_capture_startup_loads_only_its_catalog_from_service_root(tmp_path, monkeypatch):
-    (tmp_path / "config.json").write_text('{"intelligence_contract": {"enabled": true}}')
+    (tmp_path / "config.json").write_text('{"capture": {"enabled": true}}')
     monkeypatch.delenv("CHAT_CONFIG", raising=False)
     monkeypatch.setattr(settings, "_config", None)
     monkeypatch.setattr(runtime, "configure_auth", lambda *args: (None, None, None, None, None))

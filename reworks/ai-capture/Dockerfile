@@ -1,4 +1,5 @@
 FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /bin/uv
 
 WORKDIR /app
 
@@ -9,16 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+ENV UV_PYTHON_DOWNLOADS=0
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Frontend: run `cd frontend && npm ci && npm run build` before docker build (→ static/js/).
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --locked --no-dev --no-install-project --no-cache
+
 # Runtime secrets: CHAT_CONFIG + JWT_KEYSTORE_P12_B64 (not baked into the image).
 COPY . .
 # Bundle the complete catalog/prompts directory for direct reads in ACA.
 COPY config/ ./config/
-# Reads pyproject.toml to install capture
-RUN pip install --no-cache-dir --no-deps .
+RUN uv sync --locked --no-dev --no-editable --no-cache
 RUN mkdir -p data
 RUN printf '%s\n' "{\"version\":\"${APP_VERSION}\",\"revision\":\"${GIT_REVISION}\"}" \
     > /app/build-info.json

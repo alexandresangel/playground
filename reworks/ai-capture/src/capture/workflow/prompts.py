@@ -16,7 +16,8 @@ _catalog_source = ""
 _prompt_cache: Dict[str, Tuple[float, str]] = {}
 
 def capture_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    block = config.get("intelligence_contract")
+    # Existing CHAT_CONFIG deployments can migrate without a coordinated rollout.
+    block = config.get("capture", config.get("intelligence_contract"))
     return block if isinstance(block, dict) else {}
 
 
