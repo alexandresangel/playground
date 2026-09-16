@@ -1,0 +1,211 @@
+# Capture
+
+Capture is a FastAPI service that extracts trade XML from a PDF with Azure OpenAI,
+then calls the Diapason MCP server to resolve references. Pascal owns the chat UI
+and history. Capture has no Blob Storage dependency or chat-session persistence.
+
+## Local setup
+
+Run these commands from the `ai-capture` root in Bash (Linux/macOS/WSL).
+Use Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/)
+0.12.15 or newer; CI and Docker pin uv 0.12.15.
+
+Check `uv --version` first and install/upgrade uv using the linked instructions
+if necessary. An older uv installation will fail the project's version check.
+
+```bash
+# Initialize and activate the virtual environment.
+uv venv --python 3.12 .venv
+source .venv/bin/activate
+
+# Install Capture and its development dependencies from uv.lock.
+uv sync --locked
+
+# Run the offline test suite.
+python -m pytest
+
+# Create local configuration if it does not already exist.
+test -f config.json || cp config.example.json config.json
+```
+
+You can also create the environment with `python3.12 -m venv .venv`, then activate
+it and run `uv sync --locked`. Activation is optional when using `uv run`; for
+example, `uv run --locked python -m pytest` runs the same tests.
+
+Dependencies are declared in `pyproject.toml`; `uv.lock` records their resolved
+versions. There are no `requirements*.txt` files. After an intentional dependency
+change, run `uv lock`, `uv sync --locked`, and the tests, then commit both project
+metadata and the updated lockfile. Use `uv add PACKAGE` or `uv add --dev PACKAGE`
+to add dependencies, and `uv build --wheel` to build the package.
+
+## Configure Capture
+
+Local settings come from the gitignored `config.json`. In ACA, `CHAT_CONFIG`
+contains the same JSON and takes precedence over the local file. The example
+contains only `jwt`, `capture`, `azure_openai`, and `mcp.default`.
+
+| Setting | Purpose |
+| --- | --- |
+| `jwt.keystore_password` | Password used to create/read the local PKCS#12 keystore. |
+| `jwt.revoked` | Initial JWT revocation entries; normally empty locally. |
+| `capture.enabled` | Enable extraction; `true` in the example. |
+| `capture.cache_ttl_seconds` | Cache duration for local prompt text. |
+| `capture.max_pdf_bytes` | Maximum PDF size; 10 MiB by default. |
+| `capture.view_entity` | Fallback entity when the catalog does not specify one. |
+| `capture.temperature` | Model temperature for extraction. |
+| `azure_openai.endpoint` | Azure OpenAI resource endpoint. |
+| `azure_openai.api_key` | Resource API key. |
+| `azure_openai.deployment` | Model deployment name in that resource. |
+| `azure_openai.api_version` | Azure API version used by the client. |
+| `mcp.default.server_url` | URL of the separate Diapason MCP service. |
+| `mcp.default.config_key` | Fernet key shared with the MCP service's `MCP_CONFIG_KEY`. |
+
+For existing deployments, `intelligence_contract` remains a fallback for the
+`capture` block. If both are present, `capture` takes precedence. Persona/UI
+settings, extra MCP servers, chat tool-loop limits, and chat pricing settings are
+not part of the Capture configuration.
+
+Capture listens on port **8000** in the examples. The example MCP URL uses
+**8001**; change it to your actual MCP service URL. Capture does not host `/mcp`.
+
+Generate a Fernet key with:
+
+```bash
+uv run --locked python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Set the same key in `config.json` under `mcp.default.config_key` and in the MCP
+server's `MCP_CONFIG_KEY`. If using an existing MCP service, use its existing
+shared key; changing only Capture's key will prevent the MCP server from decrypting
+requests.
+
+For the company document-analyzer setup, set `azure_openai.endpoint` to
+`https://diapason-document-analyzer.openai.azure.com/` and copy **KEY 1** from the
+[Azure portal resource keys page](https://portal.azure.com/#@mydiapason.com/resource/subscriptions/55c22f82-5b11-46b0-afce-8e1cd2c422cc/resourceGroups/document-analyzer/providers/Microsoft.CognitiveServices/accounts/document-analyzer/cskeys)
+into `azure_openai.api_key`. Also set the actual model deployment name. Keep these
+values in local `config.json` or runtime secrets.
+
+### Bundled catalog and prompts
+
+```text
+config/catalog.json
+config/prompts/*.txt
+config/trade.xml
+```
+
+The root `config/` directory is copied to `/app/config/` in the image and read
+directly. Prompt paths in the catalog are relative to that directory. Edit these
+files and rebuild/redeploy the image to update ACA. `POST /api/refresh-prompt`
+(with a JWT carrying the `refresh` role) reloads the local catalog and clears the
+prompt cache; it does not download new content.
+
+## Create a keystore and start the service
+
+Set `JWT_KEYSTORE_PASSWORD` to the same value as `jwt.keystore_password` in
+`config.json`. This environment variable is used by the CLI; the service reads
+the password from its JSON configuration.
+
+```bash
+export JWT_KEYSTORE_PASSWORD='change-me'
+# Run once to create the local keystore.
+uv run --locked python -m dia_jwt create-keystore --path jwt_keystore.p12
+
+# Keep this terminal running.
+uv run --locked uvicorn capture.asgi:app --host 0.0.0.0 --port 8000
+```
+
+With the virtual environment activated, the start command can also be written as
+`uvicorn capture.asgi:app --host 0.0.0.0 --port 8000`.
+
+## Mint a token and call Capture
+
+Open a **second terminal** in the project root:
+
+```bash
+export JWT_KEYSTORE_PASSWORD='change-me'
+TOKEN=$(uv run --locked python -m dia_jwt mint --sub instance:local --role chat --days 1 \
+  | awk '/^Authorization: Bearer / { print $3 }')
+
+# Show the token if needed.
+echo "$TOKEN"
+
+# These credentials belong to the Diapason API, not the Capture JWT above.
+export DIAPASON_API_TOKEN='replace-with-your-Diapason-API-token'
+export DIAPASON_BASE_URL='https://your-diapason-host/diapason'
+
+curl --fail-with-body http://localhost:8000/health
+
+curl --fail-with-body -X POST http://localhost:8000/api/capture \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "X-Diapason-User-Id: 1" \
+  -H "X-Diapason-Customer-Id: 1" \
+  -H "X-Diapason-Mcp-Token: ${DIAPASON_API_TOKEN}" \
+  -H "X-Diapason-Mcp-Scope: 1" \
+  -H "X-Diapason-Mcp-Base-Url: ${DIAPASON_BASE_URL}" \
+  -F "trade_type=iamLoan" \
+  -F "pdf=@tests/fixtures/sample-loan-contract.pdf;type=application/pdf" \
+  -F "debug=true"
+```
+
+The canonical route is **`/api/capture`**; `/ai/capture` is not registered. The
+legacy route is still supported:
+
+```bash
+curl --fail-with-body -X POST http://localhost:8000/api/skills/intelligence-contract \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "X-Diapason-User-Id: 1" \
+  -H "X-Diapason-Customer-Id: 1" \
+  -H "X-Diapason-Mcp-Token: ${DIAPASON_API_TOKEN}" \
+  -H "X-Diapason-Mcp-Scope: 1" \
+  -H "X-Diapason-Mcp-Base-Url: ${DIAPASON_BASE_URL}" \
+  -F "trade_type=iamLoan" \
+  -F "pdf=@tests/fixtures/sample-loan-contract.pdf;type=application/pdf" \
+  -F "debug=true"
+```
+
+`GET /api/capture` returns supported trade types and the prompt version, using the
+same bearer token. Health endpoints (`/health` and `/api/health`) require no token.
+The `chat` JWT role and existing `X-Diapason-*` headers remain for compatibility.
+JWT CLI details are in [dia_jwt/README.md](src/capture/common/dia_jwt/README.md).
+
+Optional `session_id` form data takes precedence over `X-Diapason-Chat-Session`.
+Capture echoes the supplied ID, or generates a UUID, only for response/trace
+correlation. It does not look up sessions or save turns or extraction artifacts.
+Authentication and tenant/MCP identity checks still apply.
+
+## CI and Docker
+
+[CI](.github/workflows/ci.yml) uses the existing self-hosted Linux runner, Python
+3.12, and pinned uv. It runs `uv sync --locked --group dev`, the complete `tests/`
+suite, and a wheel build. Tests use local credentials and model/MCP doubles; they
+need no Azure API key or live MCP server. The workflow follows the
+[uv GitHub Actions integration](https://docs.astral.sh/uv/guides/integration/github/).
+
+The [Dockerfile](Dockerfile) installs only locked production dependencies and a
+non-editable Capture package. It uses the bundled `config/`; local environments,
+tests, build artifacts, and `config*.json` secrets are excluded from the image.
+Runtime secrets remain `CHAT_CONFIG` and `JWT_KEYSTORE_P12_B64`.
+
+## Deployment and observability
+
+`./deploy/deploy.sh <dev|test|prod>` uses the shared
+[service-deploy tooling](../actions/service-deploy/README.md), Infisical, the GHE
+registry, and Azure Container Apps. Existing app/image naming (`diapason-agent`),
+Infisical path (`/diapason-agent`), and the shared Terraform state backend are
+unchanged. Required secrets are `CHAT_CONFIG`, `JWT_KEYSTORE_P12_B64`, and the
+shared registry credentials. Shared OpenTelemetry settings remain supported.
+
+The deploy workflow builds for dev and promotes an existing image tag for test
+and prod. Catalog and prompt changes travel with that image. There is no frontend
+build or separate content upload. Post-deploy checks verify `/health` and the image
+tag unless `SKIP_SMOKE=1`; they do not perform a live model/MCP extraction.
+
+`/health` reports `VERSION` and the revision embedded at image build time.
+OpenTelemetry continues to export HTTP and AI spans plus completion outcomes,
+identity, and correlation IDs. Completion telemetry contains no document content
+or storage links.
+
+## Change records
+
+- [Configuration, uv, CI, and local usage](CONFIG_UV_CI_CHANGES.md)
+- [Blob Storage removal](BLOB_STORAGE_REMOVAL.md)
