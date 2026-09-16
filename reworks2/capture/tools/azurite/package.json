@@ -1,8 +1,0 @@
-{
-  "name": "capture-local-storage",
-  "private": true,
-  "description": "Pinned Microsoft Azurite for Capture development and integration tests",
-  "devDependencies": {
-    "azurite": "3.37.0"
-  }
-}

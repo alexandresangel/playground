@@ -1,5 +1,0 @@
-.venv/
-.work/
-.pytest_cache/
-**/.pytest-artifacts/
-**/__pycache__/
