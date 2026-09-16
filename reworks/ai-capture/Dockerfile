@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Frontend: run `cd frontend && npm ci && npm run build` before docker build (→ static/js/).
 # Runtime secrets: CHAT_CONFIG + JWT_KEYSTORE_P12_B64 (not baked into the image).
 COPY . .
+# Bundle the complete catalog/prompts directory for direct reads in ACA.
+COPY config/ ./config/
 # Reads pyproject.toml to install capture
 RUN pip install --no-cache-dir --no-deps .
 RUN mkdir -p data

@@ -1,54 +1,12 @@
-"""Offline container fixture: real ASGI/JWT/graphs with local Blob and model doubles.
+"""Offline container fixture: real ASGI/JWT/graphs with bundled config and model doubles.
 
 Mounted only by the migration container check. Never copied into the runtime image.
 """
 
 import importlib
-import json
-import os
-from pathlib import Path
 from types import SimpleNamespace as NS
-from azure.core.exceptions import ResourceNotFoundError
 
 from capture.workflow import graph
-import blob_client
-import session_store
-
-
-STATE = Path("/test-state")
-
-
-class LocalBlob:
-    def __init__(self, key):
-        self.path = STATE / "blobs" / key
-
-    def download_blob(self):
-        if not self.path.is_file():
-            raise ResourceNotFoundError("test blob missing")
-        return NS(readall=self.path.read_bytes, properties=None)
-
-    def upload_blob(self, data, **kwargs):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_bytes(data)
-
-    def delete_blob(self):
-        self.path.unlink()
-
-
-class LocalContainer:
-    def create_container(self): pass
-    def get_blob_client(self, key): return LocalBlob(key)
-    def list_blobs(self, name_starts_with):
-        root = STATE / "blobs"
-        return [NS(name=p.relative_to(root).as_posix()) for p in root.rglob("*.json") if p.relative_to(root).as_posix().startswith(name_starts_with)]
-
-
-def read_prompt(account, container, key):
-    if key == "system_prompt.md":
-        return "Original system prompt fixture"
-    if key.endswith("catalog.json"):
-        return json.dumps({"version": "offline-1", "default_view_entity": "loanDeposit", "prompts": {"prompts/mltLoan.txt": ["iamLoan"]}})
-    return "Extract the exact trade type requested."
 
 
 class Model:
@@ -68,8 +26,6 @@ class Model:
         return NS(choices=[NS(message=NS(content=text, tool_calls=[]))], usage=usage)
 
 
-blob_client.read_blob_text = read_prompt
-session_store.connect_blob = lambda *args: (None, LocalContainer(), "offline-double")
 runtime_module = importlib.import_module("capture.runtime")
 runtime_module.AzureOpenAI = lambda **kwargs: Model()
 

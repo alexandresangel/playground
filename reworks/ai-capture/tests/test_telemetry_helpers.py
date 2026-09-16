@@ -12,7 +12,6 @@ from telemetry import (
     estimate_cost_usd,
     merge_usage,
     query_preview,
-    session_blob_url,
     skills_csv,
     tools_csv,
     usage_from_completion,
@@ -35,13 +34,7 @@ def test_usage_and_cost() -> None:
     assert cost == (1000 * 1.0 + 500 * 2.0) / 1_000_000.0
 
 
-def test_blob_url_and_csv() -> None:
-    url = session_blob_url(
-        {"storage": {"account_name": "diapasondevstor", "chat_container": "chat-sessions"}},
-        "inst/1/2",
-        "abc",
-    )
-    assert url == "https://diapasondevstor.blob.core.windows.net/chat-sessions/inst/1/2/abc.json"
+def test_csv() -> None:
     assert tools_csv([{"name": "Balance"}, {"name": "Balance"}, {"tool": "Movements"}]) == "Balance,Movements"
     assert skills_csv({"skill": "intelligence-contract"}) == "intelligence-contract"
 
@@ -49,5 +42,5 @@ def test_blob_url_and_csv() -> None:
 if __name__ == "__main__":
     test_query_preview_truncates()
     test_usage_and_cost()
-    test_blob_url_and_csv()
+    test_csv()
     print("OK")

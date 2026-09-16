@@ -52,10 +52,10 @@ def create_capture_graph(*, cluster: McpCluster, config: dict, azure: dict, debu
             )
             duration = int((time.perf_counter() - started) * 1000)
             entry = {
-                # These labels are serialized to the existing UI/session contract.
+                # Keep the existing tool labels in the response contract.
                 "name": "intelligence-contract", "tool": "extract_xml",
                 "mcp_label": "Intelligence contract", "duration_ms": duration,
-                "arguments": {"trade_type": state["trade_type"], "prompt_blob": detail.get("prompt_blob")},
+                "arguments": {"trade_type": state["trade_type"], "prompt_path": detail.get("prompt_path")},
             }
             return {"extract": detail, "extract_ms": duration, "tool_trace": [entry]}
 
@@ -101,10 +101,6 @@ def create_capture_graph(*, cluster: McpCluster, config: dict, azure: dict, debu
             "menu_name": state["menu_name"], "trade_type": state["trade_type"],
             "extracted_field_count": count_extracted_fields(resolved_xml) if success else 0,
             "message": message, "warnings": warnings, "tool_trace": state["tool_trace"],
-            "session_artifacts": {
-                "extract": detail, "resolve_references": body,
-                "source_trade_xml": detail["trade_xml"], "resolved_trade_xml": resolved_xml,
-            },
             "timings_ms": {"extract": state["extract_ms"], "resolve": state["resolve_ms"]},
         }
         if debug:

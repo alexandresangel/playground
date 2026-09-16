@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from fastapi import HTTPException, Request
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 import logging
@@ -9,9 +8,7 @@ import sys
 from openai import AzureOpenAI
 
 import telemetry
-from session_store import create_session_store
 from settings import load_config
-from i18n import LOCALE_HEADER, locale_from_header_value
 from auth_setup import configure_auth
 import build_info
 from capture.workflow.prompts import capture_enabled, init_capture_prompts
@@ -28,7 +25,6 @@ class Runtime:
     require_admin: Callable
     require_refresh: Callable
     require_chat: Callable
-    sessions: Any
     tracer: Any = None
 
     def azure_client(self) -> Optional[Dict[str, Any]]:
@@ -62,10 +58,9 @@ def create_runtime(base_dir: Path) -> Runtime:
         tracer = None
     config = load_config(base_dir)
     auth, get_identity, require_admin, require_refresh, require_chat = configure_auth(base_dir, config)
-    sessions = create_session_store(config)
     if capture_enabled(config):
-        init_capture_prompts(config)
-    return Runtime(base_dir, config, auth, get_identity, require_admin, require_refresh, require_chat, sessions, tracer)
+        init_capture_prompts(config, base_dir)
+    return Runtime(base_dir, config, auth, get_identity, require_admin, require_refresh, require_chat, tracer)
 
 
 def build_azure_client(config: dict) -> Optional[Dict[str, Any]]:
@@ -89,21 +84,3 @@ def build_azure_client(config: dict) -> Optional[Dict[str, Any]]:
         "deployment": deployment,
     }
 
-
-def resolve_session_id(runtime: Runtime, scope: str, session_id: Optional[str]) -> str:
-    try:
-        return runtime.sessions.resolve_session_id(scope, session_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Unknown session_id") from exc
-
-
-def session_store_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, RuntimeError) and "Azure Blob" in str(exc):
-        log.error("session storage: %s", exc, exc_info=exc)
-        return HTTPException(status_code=503, detail=str(exc))
-    log.exception("session storage unexpected error")
-    raise exc
-
-
-def locale_from_request(request: Request) -> str:
-    return locale_from_header_value(request.headers.get(LOCALE_HEADER))

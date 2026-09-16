@@ -1,7 +1,9 @@
 from unittest.mock import Mock
+import json
 
 import settings
 from capture import runtime
+from capture.workflow import prompts
 
 
 def test_capture_startup_loads_only_its_catalog_from_service_root(tmp_path, monkeypatch):
@@ -9,12 +11,20 @@ def test_capture_startup_loads_only_its_catalog_from_service_root(tmp_path, monk
     monkeypatch.delenv("CHAT_CONFIG", raising=False)
     monkeypatch.setattr(settings, "_config", None)
     monkeypatch.setattr(runtime, "configure_auth", lambda *args: (None, None, None, None, None))
-    monkeypatch.setattr(runtime, "create_session_store", lambda config: None)
     monkeypatch.setattr(runtime.telemetry, "init_otel", lambda **kwargs: None)
-    catalog = Mock()
-    monkeypatch.setattr(runtime, "init_capture_prompts", catalog)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "catalog.json").write_text(json.dumps({"version": "local-1", "prompts": {"prompt.txt": ["test"]}}))
+    (config_dir / "prompt.txt").write_text("Local extraction prompt", encoding="utf-8")
+    for name in ("_config_dir", "_catalog", "_catalog_version", "_catalog_source", "_prompt_cache"):
+        monkeypatch.setattr(prompts, name, getattr(prompts, name))
+    monkeypatch.chdir(tmp_path.parent)
     result = runtime.create_runtime(tmp_path)
-    catalog.assert_called_once_with(result.config)
+    assert "storage" not in result.config
+    assert not hasattr(result, "sessions")
+    assert prompts.capture_prompt_source() == str(config_dir / "catalog.json")
+    assert prompts.capture_prompt_version() == "local-1"
+    assert prompts.get_prompt_text(result.config, "prompt.txt") == "Local extraction prompt"
     assert not (tmp_path / "system_prompt.md").exists()
 
 

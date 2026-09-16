@@ -22,7 +22,7 @@ def create_router(runtime: Runtime) -> APIRouter:
         if not capture_enabled(runtime.config):
             raise HTTPException(status_code=404, detail="Capture is disabled")
         try:
-            return refresh_capture_prompts(runtime.config)
+            return refresh_capture_prompts(runtime.config, runtime.base_dir)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 

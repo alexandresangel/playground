@@ -78,8 +78,8 @@ def extract_trade_xml_detail(
     azure: Dict[str, Any],
 ) -> Dict[str, Any]:
     type_cfg = get_trade_type_config(trade_type)
-    prompt_blob = type_cfg["prompt_blob"]
-    prompt = get_prompt_text(config, prompt_blob)
+    prompt_path = type_cfg["prompt_path"]
+    prompt = get_prompt_text(config, prompt_path)
     document_text = pdf_to_text(pdf_bytes)
 
     client = azure["client"]
@@ -112,7 +112,7 @@ def extract_trade_xml_detail(
 
     return {
         "trade_type": trade_type,
-        "prompt_blob": prompt_blob,
+        "prompt_path": prompt_path,
         "deployment": deployment,
         "temperature": capture_temperature(config),
         "pdf_text_length": len(document_text),

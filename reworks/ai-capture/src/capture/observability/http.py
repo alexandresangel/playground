@@ -3,7 +3,6 @@
 from typing import Any, Optional
 import logging
 
-from telemetry import session_blob_path, session_blob_url
 from capture.runtime import Runtime
 
 
@@ -42,11 +41,6 @@ def apply_identity_span_attrs(runtime: Runtime,
     if session_id and scope:
         set_span_attr(span, "diapason.session_id", session_id)
         set_span_attr(span, "diapason.scope", scope)
-        path = session_blob_path(scope, session_id)
-        set_span_attr(span, "diapason.session_blob_path", path)
-        set_span_attr(
-            span, "diapason.session_blob_url", session_blob_url(runtime.config, scope, session_id)
-        )
     elif session_id:
         set_span_attr(span, "diapason.session_id", session_id)
     elif scope:

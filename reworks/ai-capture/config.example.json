@@ -3,9 +3,6 @@
     "keystore_password": "change-me",
     "revoked": { "jtis": {}, "subs": {} }
   },
-  "prompt": {
-    "system_prompt_blob": "system_prompt.md"
-  },
   "ui": {
     "assistant_name": "Pascal",
     "assistant_identity": "You are Pascal, the Diapason treasury assistant in this chat. You are named after Pascal Kravitzch, founder of Diapason. Introduce yourself as Pascal when appropriate; stay professional and product-focused.",
@@ -17,17 +14,8 @@
   "context": {
     "timezone": "UTC"
   },
-  "sessions": {
-    "max_turns": 30
-  },
-  "storage": {
-    "account_name": "diapasondevstor",
-    "chat_container": "chat-sessions",
-    "config_container": "agent-config"
-  },
   "intelligence_contract": {
     "enabled": false,
-    "catalog_blob": "skills/intelligence-contract/catalog.json",
     "cache_ttl_seconds": 300,
     "max_pdf_bytes": 10485760,
     "view_entity": "loanDeposit",

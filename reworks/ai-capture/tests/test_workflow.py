@@ -18,8 +18,7 @@ def workflow(monkeypatch):
     monkeypatch.setattr(prompts, "_catalog", json.loads(CATALOG.read_text()))
     monkeypatch.setattr(prompts, "_prompt_cache", {})
     monkeypatch.setattr(prompts, "_catalog_version", "")
-    reads = Mock(return_value="original extraction prompt")
-    monkeypatch.setattr(prompts, "read_blob_text", reads)
+    monkeypatch.setattr(prompts, "_config_dir", CATALOG.parent)
     completion = Mock(return_value=NS(
         choices=[NS(message=NS(content='```xml\n<trade><tradeType shortname="wrong"/><amount>123</amount></trade>\n```'))],
         usage=NS(prompt_tokens=11, completion_tokens=7, total_tokens=18),
@@ -27,9 +26,9 @@ def workflow(monkeypatch):
     client = NS(chat=NS(completions=NS(create=completion)))
     resolver = Mock(return_value={"success": True, "trade_xml": '<trade><tradeType shortname="iamLoan"/><amount>123</amount></trade>', "warnings": ["review"]})
     monkeypatch.setattr(graph, "mcp_call_tool_json", resolver)
-    config = {"storage": {"account_name": "test"}, "intelligence_contract": {"temperature": 0.5}}
+    config = {"intelligence_contract": {"temperature": 0.5}}
     cluster = McpCluster((McpServerContext("default", "Diapason", "https://mcp.example", {"Authorization": "caller"}),))
-    return NS(config=config, cluster=cluster, azure={"client": client, "deployment": "same-model"}, completion=completion, resolver=resolver, reads=reads)
+    return NS(config=config, cluster=cluster, azure={"client": client, "deployment": "same-model"}, completion=completion, resolver=resolver)
 
 
 def run(workflow, **kwargs):
@@ -40,14 +39,16 @@ def test_pdf_to_xml_and_original_resolver_contract(workflow):
     result = run(workflow, debug=True)
     call = workflow.completion.call_args.kwargs
     assert call["model"] == "same-model" and call["temperature"] == 0.5
-    assert call["messages"][0] == {"role": "system", "content": "original extraction prompt"}
+    assert call["messages"][0] == {"role": "system", "content": (CATALOG.parent / "prompts/mltLoan.txt").read_text(encoding="utf-8")}
     assert call["messages"][1]["content"].startswith("Extract the trade as Diapason import XML from this document text. Return XML only.\n\n")
     assert result["success"] and result["trade_type"] == "iamLoan"
     args, kw = workflow.resolver.call_args
     assert args[:2] == (workflow.cluster.diapason, "resolveReferences")
     assert kw == {"timeout_s": 180.0}
     assert 'shortname="iamLoan"' in args[2]["trade_xml"]
-    assert result["session_artifacts"]["source_trade_xml"] == args[2]["trade_xml"]
+    assert "session_artifacts" not in result
+    assert result["debug"]["extract"]["trade_xml"] == args[2]["trade_xml"]
+    assert result["tool_trace"][0]["arguments"]["prompt_path"] == "prompts/mltLoan.txt"
     assert result["debug"]["resolve_references_request"] == args[2]
     assert [t["tool"] for t in result["tool_trace"]] == ["extract_xml", "resolveReferences"]
 
@@ -69,7 +70,8 @@ def test_resolver_failure_result(workflow, body):
     result = run(workflow)
     assert result["success"] is False and result["extracted_field_count"] == 0
     assert "debug" not in result
-    assert result["session_artifacts"]["resolve_references"] == body
+    assert "session_artifacts" not in result
+    assert result["warnings"] == body.get("warnings", [])
 
 
 @pytest.mark.parametrize("content,error", [("", RuntimeError), ("not XML", ValueError), ("<broken", ValueError)])
@@ -80,14 +82,18 @@ def test_bad_model_output_never_resolves(workflow, content, error):
     workflow.resolver.assert_not_called()
 
 
-def test_catalog_refresh_and_cache_invalidation(workflow):
-    text = CATALOG.read_text()
-    workflow.reads.side_effect = [text, "first prompt", text, "new prompt"]
-    first = prompts.init_capture_prompts(workflow.config)
+def test_catalog_refresh_and_cache_invalidation(workflow, tmp_path):
+    config_dir = tmp_path / "config"
+    (config_dir / "prompts").mkdir(parents=True)
+    (config_dir / "catalog.json").write_bytes(CATALOG.read_bytes())
+    prompt = config_dir / "prompts/mltLoan.txt"
+    prompt.write_text("first prompt", encoding="utf-8")
+    first = prompts.init_capture_prompts(workflow.config, tmp_path)
     assert isinstance(first["version"], str) and first["version"]
+    assert first["source"] == str(config_dir / "catalog.json")
     assert prompts.get_prompt_text(workflow.config, "prompts/mltLoan.txt") == "first prompt"
+    prompt.write_text("new prompt", encoding="utf-8")
     assert prompts.get_prompt_text(workflow.config, "prompts/mltLoan.txt") == "first prompt"
-    assert prompts.refresh_capture_prompts(workflow.config) == first
+    assert prompts.refresh_capture_prompts(workflow.config, tmp_path) == first
     assert prompts.get_prompt_text(workflow.config, "prompts/mltLoan.txt") == "new prompt"
     assert prompts.capture_prompt_version() == first["version"]
-    assert workflow.reads.call_args.args == ("test", "agent-config", "skills/intelligence-contract/prompts/mltLoan.txt")

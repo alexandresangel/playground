@@ -11,7 +11,7 @@ dynamic = ["dependencies"]
 
 [tool.setuptools]
 packages = ["capture", "capture.api", "capture.observability", "capture.workflow", "dia_jwt", "locales"]
-py-modules = ["auth_setup", "blob_client", "build_info", "i18n", "mcp_context", "mcp_rpc", "session_store", "settings", "telemetry"]
+py-modules = ["auth_setup", "build_info", "i18n", "mcp_context", "mcp_rpc", "settings", "telemetry"]
 include-package-data = false
 
 [tool.setuptools.package-dir]

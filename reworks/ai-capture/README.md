@@ -2,7 +2,7 @@
 
 TODO: write this README for Capture project
 
-FastAPI app: agent UI, session storage (Azure Blob), Azure OpenAI tool loop, MCP orchestration, and skills (e.g. intelligence contract).
+FastAPI extraction service using Azure OpenAI and MCP. Capture reads its bundled configuration locally and does not persist documents, extraction results, or chat history; Pascal owns chat persistence.
 
 **Deploy:** [service-deploy README](../actions/service-deploy/README.md) — GHE registry → Azure Container Apps via `deploy/deploy.sh`.
 
@@ -27,40 +27,31 @@ Static assets: `static/index.html` (full chat), `static/agent/agent-widget.js` (
 | Local | `config.json` (gitignored; copy `config.example.json`); keystore via `jwt_keystore.p12` or `JWT_KEYSTORE_P12_B64` |
 | Azure | Secrets **`CHAT_CONFIG`** + **`JWT_KEYSTORE_P12_B64`** from Infisical |
 
-Keys: `jwt`, `azure_openai`, `prompt`, `context`, `sessions`, `storage`, `mcp`, `ui`, `intelligence_contract` — see `config.example.json`.
+Keys: `jwt`, `azure_openai`, `context`, `mcp`, `ui`, `intelligence_contract` — see `config.example.json`.
 
-**Blob containers** (Terraform on shared env storage):
-| Container | Purpose | App RBAC |
-|-----------|---------|----------|
-| `chat-sessions` | Chat history | Blob Data Contributor |
-| `agent-config` | System prompt + per-skill config (IC catalog/prompts, …) | Blob Data Reader |
+**Bundled extraction configuration:**
 
-Set `storage.chat_container` and `storage.config_container` in `CHAT_CONFIG`.
-
-**Config layout** (`agent-config`):
-```
-system_prompt.md
-skills/intelligence-contract/catalog.json
-skills/intelligence-contract/prompts/*.txt
+```text
+config/catalog.json
+config/prompts/*.txt
+config/trade.xml
 ```
 
-Override system prompt blob with `prompt.system_prompt_blob` (per-client `CHAT_CONFIG` can point at a different blob). Reload: `POST /api/refresh-prompt` (JWT role **`refresh`**).
+The root `config/` directory is included in the Docker image at `/app/config/`.
+The catalog and its relative prompt paths are read directly from this directory.
+There is no storage account setting, remote catalog path, upload step, or storage permission requirement for Capture.
+The existing `intelligence_contract` settings block and API aliases remain for compatibility.
 
-**Upload config blobs** (independent of app deploy — no image rebuild):
+Edit `config/` and rebuild/redeploy the image to change configuration in ACA.
+`POST /api/refresh-prompt` (JWT role **`refresh`**) rereads the local catalog and clears the prompt cache; it cannot update files baked into a deployed image.
 
-Uploads `system_prompt.md` and intelligence-contract catalog/prompts into the env’s `agent-config` container. Account/container come from `config.<env>.json` (or `config.json`), or `STORAGE_ACCOUNT_NAME` / `CONFIG_BLOB_CONTAINER`.
+**Docker image:** `config/` contains extraction content; secrets still arrive through `CHAT_CONFIG` + `JWT_KEYSTORE_P12_B64` at runtime. The root `config.json` is excluded from the image.
 
-```bash
-az login   # needs Storage Blob Data Contributor on the config container
-./deploy/deploy-config.sh dev
-./deploy/deploy-config.sh test
-./deploy/deploy-config.sh prod
-# optional overrides: STORAGE_ACCOUNT_NAME=… CONFIG_BLOB_CONTAINER=agent-config CONFIG_JSON=…
-```
-
-After upload, reload the running app: `POST /api/refresh-prompt` with a JWT that has role **`refresh`** (mint with `--role refresh`).
-
-**Docker image:** no secrets; `CHAT_CONFIG` + `JWT_KEYSTORE_P12_B64` at runtime. Sessions and prompts live in Blob.
+**Session correlation:** `session_id` in the form takes precedence over `X-Diapason-Chat-Session`.
+Capture echoes the supplied ID, or generates a UUID when neither is supplied, solely for response/trace correlation.
+It does not look up sessions, validate ownership of these IDs, or save turns or artifacts.
+Authentication and tenant/MCP identity checks still apply. Pascal owns session history and authorization.
+Extraction details and tool traces now call the relative local prompt reference `prompt_path`.
 
 ## Auth
 
@@ -69,9 +60,9 @@ After upload, reload the running app: `POST /api/refresh-prompt` with a JWT that
 | `Authorization: Bearer` (chat JWT) | Chat API (`chat` role) |
 | `X-Diapason-Mcp-Token` | Diapason API JWT → Fernet MCP bearer |
 | `X-Diapason-Mcp-Scope`, `X-Diapason-Mcp-Base-Url` | Tenant context in MCP bearer |
-| `X-Diapason-User-Id`, `X-Diapason-Customer-Id` | Session scope |
+| `X-Diapason-User-Id`, `X-Diapason-Customer-Id` | Caller identity and trace scope |
 | `X-Diapason-Locale` | UI strings |
-| `X-Diapason-Chat-Session` | Active session id |
+| `X-Diapason-Chat-Session` | Pascal correlation ID (no Capture session storage) |
 
 Required on API routes except `GET /health`, `GET /api/health`, and `GET /api/i18n`. Details: [`dia_jwt/README.md`](dia_jwt/README.md).
 
@@ -82,7 +73,7 @@ UI assets: `frontend/` (esbuild; marked, dompurify, vega) → `static/js/` (giti
 ```bash
 source /phantom/mcc/configs/env/nodejs
 cd frontend && npm ci && npm run build
-cp config.example.json config.json   # edit azure_openai, mcp, storage; upload system_prompt.md to agent-config
+cp config.example.json config.json   # edit azure_openai, mcp; enable intelligence_contract; extraction content is in config/
 python3 -m dia_jwt create-keystore --path jwt_keystore.p12
 # optional: export JWT_KEYSTORE_P12_B64="$(base64 -w0 jwt_keystore.p12)"  # else app reads jwt_keystore.p12
 python3 -m venv .venv && source .venv/bin/activate
@@ -101,7 +92,7 @@ pytest test/ -v \
   --ignore=test/test_agent_smoke.py \
   --ignore=test/test_tool_route.py \
   --ignore=test/test_source_extract.py
-# ignored: live API; app-import (config/keystore/blob); source_extract locale filter drift
+# ignored: legacy live API/app-import tests; source_extract locale filter drift
 
 # Live API (server running):
 cp test/test.api.example.json test/test.api.json   # edit agent_url / jwt / diapason_*
@@ -113,7 +104,7 @@ python test/test_agent_smoke.py
 
 App image / ACA: `./deploy/deploy.sh <dev|test|prod>` (see below).
 
-**Content** (prompts / IC catalog — not in the image): `./deploy/deploy-config.sh <dev|test|prod>` after `az login`, then `POST /api/refresh-prompt` (JWT role **`refresh`**). Uses `config.<env>.json` for storage account (e.g. `diapasonprodstor` / `agent-config` for prod).
+**Content** (catalog and prompts): edit `config/`, then rebuild and deploy the app image. Configuration travels with the image when promoting between environments.
 
 ```bash
 ./deploy/deploy.sh <dev|test|prod>
@@ -133,7 +124,7 @@ Infisical path: `/diapason-agent` (env slug = argument):
 
 | Secret | Required | Notes |
 |--------|----------|--------|
-| `CHAT_CONFIG` | yes | Full agent JSON (`storage.account_name` + containers) |
+| `CHAT_CONFIG` | yes | Runtime JSON from `config.example.json`; no storage settings |
 | `SMOKE_API_CONFIG` | yes (unless `SKIP_SMOKE=1`) | Same shape as `test/test.api.example.json`. Prefer `diapason_client_id` + `diapason_client_secret` (smoke calls `{diapason_base_url}/api/login`); or static `diapason_api_jwt_token`. `agent_url` overridden by deploy via `AGENT_URL`. |
 | `JWT_KEYSTORE_P12_B64` | yes | base64 PKCS#12; ACA secret → env (not in the image). Password in `CHAT_CONFIG.jwt.keystore_password`. Per-env keystores OK. |
 | `GHCR_TOKEN` | yes | Shared at Infisical `/` (same as other services) |
@@ -146,22 +137,18 @@ Post-deploy smoke (unless `SKIP_SMOKE=1`): `/health` + image tag + `test/test_ag
 
 When `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` / traces endpoints are set, the app exports stdlib logs to Loki and HTTP `/api/*` spans to Tempo. Outbound MCP calls inject W3C `traceparent` so MCP `mcp.tools.call` spans share the same TraceID.
 
-**Chat turn** (span `chat.completion` + one Loki line):
+**Capture completion** (span `capture.completion` + one Loki line):
 
 | Signal | Fields |
 |--------|--------|
-| Span / log | `diapason.customer_id`, `enduser.id`, `diapason.session_id`, `diapason.scope` |
-| Preview | `diapason.chat.query_preview` (~120 chars; full text stays in Blob) |
-| Tokens / cost | `gen_ai.usage.*_tokens`, `diapason.chat.cost_usd` |
-| Tools / skills | `diapason.chat.tools`, `diapason.chat.skills` |
-| Blob | `diapason.session_blob_url` → `{account}/chat-sessions/{scope}/{session_id}.json` |
+| Correlation | `diapason.customer_id`, `enduser.id`, `diapason.session_id`, `diapason.scope` |
+| Outcome | `ai.result_success` |
+| Model usage | `gen_ai.usage.*_tokens` on the model span |
 
-Cost uses `CHAT_CONFIG.azure_openai.input_usd_per_1m` / `output_usd_per_1m` (see `config.example.json`). Defaults to `0` if unset. Usage is also stored on the assistant turn in Blob as `usage: {input, output, total, cost_usd}`.
-
-Loki example:
+No storage URLs or document content are added to completion telemetry. Logs and traces continue through the existing OpenTelemetry provider.
 
 ```text
-chat done customer=… user=… session=… tokens_in=… tokens_out=… cost_usd=… tools=Balance,Movements skills=… preview='…' blob=https://…
+Capture completed success=True
 ```
 
 ```bash
@@ -189,3 +176,7 @@ GitHub **Deploy** (`.github/workflows/deploy.yml`):
 Local: `./deploy/deploy.sh dev` (build). Promote: `SKIP_BUILD=1 IMAGE_TAG=<sha> ./deploy/deploy.sh test`.
 
 Redeploy Tomcat after servlet changes (`DiapasonAgentChatProxyServlet`).
+
+## Storage-removal change record
+
+See [BLOB_STORAGE_REMOVAL.md](BLOB_STORAGE_REMOVAL.md) for the complete file inventory, validation results, and existing Terraform-state considerations. The shared Azure Terraform backend is deployment bookkeeping, not Capture document/configuration/session storage; it is unchanged.

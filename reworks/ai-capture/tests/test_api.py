@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from cryptography.fernet import Fernet
 import json
+from uuid import UUID
 
 from capture.api import extraction
 from capture.workflow import prompts
@@ -18,7 +19,7 @@ def extraction_run(service, monkeypatch):
     result = {
         "success": True, "trade_xml": "<trade/>", "trade_type": "iamLoan", "view_entity": "loanDeposit",
         "menu_name": "loanDeposit", "extracted_field_count": 3, "message": "", "warnings": [], "tool_trace": [],
-        "session_artifacts": {"source_trade_xml": "private source"}, "timings_ms": {"extract": 5},
+        "timings_ms": {"extract": 5},
     }
     run = AsyncMock(return_value=result)
     monkeypatch.setattr(extraction, "run_capture", run)
@@ -29,19 +30,15 @@ def upload(service, **kwargs):
     return service.client.post(PATH, headers=kwargs.pop("headers", service.headers), data=kwargs.pop("data", {"trade_type": " iamLoan ", "debug": "yes"}), files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")}, **kwargs)
 
 
-def test_classic_upload_persists_original_artifact_contract(service, extraction_run):
+@pytest.mark.parametrize("path", [PATH, "/api/capture"])
+def test_upload_returns_result_without_session_storage(service, extraction_run, path):
     run, client = extraction_run
-    response = upload(service)
+    response = service.client.post(path, headers=service.headers, data={"trade_type": " iamLoan ", "debug": "yes"}, files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")})
     assert response.status_code == 200
     assert "session_artifacts" not in response.json() and "timings_ms" not in response.json()
     sid = response.headers[SESSION]
-    assert len(service.runtime.sessions.writes) == 1
-    assert service.runtime.sessions.writes[0][:2] == (sid, service.scope)
-    record = service.runtime.sessions.get_session(sid, service.scope)
-    assert record["turns"][0]["content"] == "@intelligence-contract import iamLoan from contract.pdf"
-    assistant = record["turns"][1]
-    assert assistant["skill_run"]["skill"] == "intelligence-contract"
-    assert assistant["skill_run"]["artifacts"]["source_trade_xml"] == "private source"
+    assert str(UUID(sid)) == sid
+    assert not hasattr(service.runtime, "sessions")
     kwargs = run.call_args.kwargs
     assert kwargs["trade_type"] == "iamLoan" and kwargs["debug"] is True and kwargs["pdf_bytes"] == b"%PDF-exact"
     server = kwargs["cluster"].diapason
@@ -52,8 +49,8 @@ def test_classic_upload_persists_original_artifact_contract(service, extraction_
 
 
 @pytest.mark.parametrize("via_form", [False, True])
-def test_active_session_and_scope_are_preserved(service, extraction_run, via_form):
-    sid = service.runtime.sessions.create_session(service.scope)["session_id"]
+def test_pascal_correlation_id_is_preserved_without_lookup(service, extraction_run, via_form):
+    sid = "pascal-session-42"
     headers = {**service.headers, SESSION: sid}
     data = {"trade_type": "iamLoan"}
     if via_form:
@@ -61,16 +58,15 @@ def test_active_session_and_scope_are_preserved(service, extraction_run, via_for
         headers[SESSION] = "wrong-header"
     response = upload(service, headers=headers, data=data)
     assert response.status_code == 200 and response.headers[SESSION] == sid
-    assert len(service.runtime.sessions.records) == 1
 
 
-def test_cross_user_session_is_rejected(service, extraction_run):
+def test_requests_without_correlation_get_independent_ids(service, extraction_run):
     run, client = extraction_run
-    sid = service.runtime.sessions.create_session("demo/7/999")["session_id"]
-    response = upload(service, data={"trade_type": "iamLoan", "session_id": sid})
-    assert response.status_code == 404
-    run.assert_not_called()
-    client.close.assert_called_once()
+    first = upload(service)
+    second = upload(service)
+    assert first.status_code == second.status_code == 200
+    assert first.headers[SESSION] != second.headers[SESSION]
+    assert run.call_count == client.close.call_count == 2
 
 
 @pytest.mark.parametrize("mutation,status", [("token", 401), ("role", 401), ("customer", 403), ("mcp", 400), ("revoked", 401)])
@@ -92,7 +88,6 @@ def test_workflow_error_status_and_client_cleanup(service, extraction_run, error
     run.side_effect = error
     response = upload(service)
     assert response.status_code == status and response.json()["detail"] == str(error)
-    assert service.runtime.sessions.writes == []
     client.close.assert_called_once()
 
 

@@ -37,18 +37,7 @@ infisical_export_many_at "${INFISICAL_SHARED_SECRET_PATH:-/}" GHCR_TOKEN
 infisical_export_many_optional_at "${INFISICAL_SHARED_SECRET_PATH:-/}" GHCR_USERNAME
 registry_prepare
 
-STORAGE_ACCOUNT_NAME="${STORAGE_ACCOUNT_NAME:-$(jq -r '.storage.account_name // empty' <<<"$CHAT_CONFIG")}"
-CHAT_BLOB_CONTAINER="${CHAT_BLOB_CONTAINER:-$(jq -r '.storage.chat_container // "chat-sessions"' <<<"$CHAT_CONFIG")}"
-CONFIG_BLOB_CONTAINER="${CONFIG_BLOB_CONTAINER:-$(jq -r '.storage.config_container // "agent-config"' <<<"$CHAT_CONFIG")}"
-[[ -n "$STORAGE_ACCOUNT_NAME" ]] || {
-  echo "error: set STORAGE_ACCOUNT_NAME or CHAT_CONFIG.storage.account_name for terraform" >&2
-  exit 1
-}
-export STORAGE_ACCOUNT_NAME
-terraform_ensure_infra "$ROOT/deploy" \
-  -var="storage_account_name=$STORAGE_ACCOUNT_NAME" \
-  -var="chat_blob_container=$CHAT_BLOB_CONTAINER" \
-  -var="config_blob_container=$CONFIG_BLOB_CONTAINER"
+terraform_ensure_infra "$ROOT/deploy"
 
 [[ "${TERRAFORM_PLAN:-}" == 1 ]] && { log "plan only — done"; exit 0; }
 

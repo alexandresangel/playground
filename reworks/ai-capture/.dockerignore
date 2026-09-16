@@ -12,13 +12,16 @@ jwt_keystore.p12
 
 # Local-only content
 *.md
-skills/intelligence_contract/config/
-skills/intelligence_contract/data/
+# Capture content is part of the image, including any Markdown prompts.
+!config/
+!config/**
 
 # Frontend tooling (build on host/CI before docker; only static/js/ goes in the image)
 frontend/
 
 # Python / tooling
+build/
+.validation/
 __pycache__/
 *.py[cod]
 *$py.class

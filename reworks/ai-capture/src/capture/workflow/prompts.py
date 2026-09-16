@@ -1,18 +1,15 @@
-"""Capture prompts using the existing company config blob paths."""
+"""Capture catalog and prompts from the project's bundled config directory."""
 
 from __future__ import annotations
 from typing import Any, Dict, Tuple
+from pathlib import Path
 import hashlib
 import json
 import threading
 import time
 
-from blob_client import read_blob_text
-
-LEGACY_BLOB_PREFIX = "skills/intelligence-contract"
-DEFAULT_CATALOG_BLOB = f"{LEGACY_BLOB_PREFIX}/catalog.json"
-
 _lock = threading.Lock()
+_config_dir = Path.cwd() / "config"
 _catalog: Dict[str, Any] = {}
 _catalog_version = ""
 _catalog_source = ""
@@ -39,33 +36,14 @@ def capture_temperature(config: Dict[str, Any]) -> float:
         return 0.5
 
 
-def _storage(config: Dict[str, Any]) -> Dict[str, Any]:
-    block = config.get("storage")
-    return block if isinstance(block, dict) else {}
-
-
-def _storage_account(config: Dict[str, Any]) -> str:
-    return str(_storage(config).get("account_name", "") or "").strip()
-
-
-def _config_container(config: Dict[str, Any]) -> str:
-    name = str(_storage(config).get("config_container", "") or "").strip()
-    return name or "agent-config"
-
-
-def _catalog_blob(config: Dict[str, Any]) -> str:
-    name = str(
-        capture_config(config).get("catalog_blob", "") or ""
-    ).strip()
-    return name or DEFAULT_CATALOG_BLOB
-
-
-def _prompt_blob_path(prompt_blob: str) -> str:
-    """Resolve catalog-relative prompt path under the legacy blob prefix."""
-    name = (prompt_blob or "").strip().lstrip("/")
-    if name.startswith(f"{LEGACY_BLOB_PREFIX}/"):
-        return name
-    return f"{LEGACY_BLOB_PREFIX}/{name}"
+def _read_text(path: Path) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Cannot read Capture config file {path}: {exc}") from exc
+    if not text.strip():
+        raise RuntimeError(f"Empty Capture config file {path}")
+    return text
 
 
 def _cache_ttl(config: Dict[str, Any]) -> int:
@@ -76,10 +54,6 @@ def _cache_ttl(config: Dict[str, Any]) -> int:
         return 300
 
 
-def _blob_source(config: Dict[str, Any], blob_name: str) -> str:
-    return f"blob:{_config_container(config)}/{blob_name}"
-
-
 def _compute_catalog_version(catalog: Dict[str, Any], raw_text: str) -> str:
     explicit = str(catalog.get("version", "") or catalog.get("catalog_version", "") or "").strip()
     if explicit:
@@ -87,25 +61,23 @@ def _compute_catalog_version(catalog: Dict[str, Any], raw_text: str) -> str:
     return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
 
 
-def _load_catalog(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
-    account = _storage_account(config)
-    container = _config_container(config)
-    blob_name = _catalog_blob(config)
-    if not account:
-        raise RuntimeError("storage.account_name is required")
-    raw = read_blob_text(account, container, blob_name)
+def _load_catalog(config_dir: Path) -> Tuple[Dict[str, Any], str, str]:
+    path = config_dir / "catalog.json"
+    raw = _read_text(path)
     catalog = json.loads(raw)
     if not isinstance(catalog, dict):
-        raise RuntimeError(f"{blob_name} must be a JSON object")
+        raise RuntimeError(f"{path} must be a JSON object")
     version = _compute_catalog_version(catalog, raw)
-    source = _blob_source(config, blob_name)
+    source = str(path)
     return catalog, version, source
 
 
-def init_capture_prompts(config: Dict[str, Any]) -> Dict[str, Any]:
-    global _catalog, _catalog_version, _catalog_source, _prompt_cache
-    catalog, version, source = _load_catalog(config)
+def init_capture_prompts(config: Dict[str, Any], base_dir: Path | None = None) -> Dict[str, Any]:
+    global _config_dir, _catalog, _catalog_version, _catalog_source, _prompt_cache
+    config_dir = (base_dir / "config").resolve() if base_dir is not None else _config_dir.resolve()
+    catalog, version, source = _load_catalog(config_dir)
     with _lock:
+        _config_dir = config_dir
         _catalog = catalog
         _catalog_version = version
         _catalog_source = source
@@ -113,8 +85,8 @@ def init_capture_prompts(config: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "version": version, "source": source}
 
 
-def refresh_capture_prompts(config: Dict[str, Any]) -> Dict[str, Any]:
-    return init_capture_prompts(config)
+def refresh_capture_prompts(config: Dict[str, Any], base_dir: Path | None = None) -> Dict[str, Any]:
+    return init_capture_prompts(config, base_dir)
 
 
 def capture_prompt_version() -> str:
@@ -227,8 +199,8 @@ def get_trade_type_config(trade_type: str) -> Dict[str, str]:
     with _lock:
         catalog = dict(_catalog)
     by_type = _trade_type_map(catalog)
-    prompt_blob = by_type.get(key) or _default_prompt(catalog)
-    if not prompt_blob:
+    prompt_path = by_type.get(key) or _default_prompt(catalog)
+    if not prompt_path:
         known = ", ".join(sorted(by_type.keys()))
         raise ValueError(
             f"Unknown trade_type {key!r} (no default_prompt; known: {known})"
@@ -239,7 +211,7 @@ def get_trade_type_config(trade_type: str) -> Dict[str, str]:
     default_menu = _default_menu_name(catalog)
     view_entity = ve_map.get(key) or default_ve
     menu_name = menu_map.get(key) or default_menu or view_entity
-    result: Dict[str, str] = {"trade_type": key, "prompt_blob": prompt_blob}
+    result: Dict[str, str] = {"trade_type": key, "prompt_path": prompt_path}
     if view_entity:
         result["view_entity"] = view_entity
     if menu_name:
@@ -247,20 +219,23 @@ def get_trade_type_config(trade_type: str) -> Dict[str, str]:
     return result
 
 
-def get_prompt_text(config: Dict[str, Any], prompt_blob: str) -> str:
-    blob_name = (prompt_blob or "").strip()
-    if not blob_name:
-        raise ValueError("prompt_blob is required")
+def get_prompt_text(config: Dict[str, Any], prompt_path: str) -> str:
+    name = (prompt_path or "").strip()
+    if not name:
+        raise ValueError("prompt_path is required")
     ttl = _cache_ttl(config)
     now = time.time()
     with _lock:
-        cached = _prompt_cache.get(blob_name)
+        config_dir = _config_dir.resolve()
+        path = (config_dir / name).resolve()
+        if Path(name).is_absolute() or not path.is_relative_to(config_dir):
+            raise ValueError("prompt_path must be relative to the Capture config directory")
+        cache_key = str(path)
+        cached = _prompt_cache.get(cache_key)
         if cached and cached[0] > now:
             return cached[1]
 
-    account = _storage_account(config)
-    container = _config_container(config)
-    text = read_blob_text(account, container, _prompt_blob_path(blob_name))
+    text = _read_text(path)
     with _lock:
-        _prompt_cache[blob_name] = (now + ttl, text)
+        _prompt_cache[cache_key] = (now + ttl, text)
     return text

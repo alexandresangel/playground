@@ -7,6 +7,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from langsmith import get_tracing_context
 
 from capture.observability import ai
+from capture.observability.http import apply_identity_span_attrs
 
 
 def exporter():
@@ -60,4 +61,17 @@ def test_incoming_trace_is_parent_of_http_span(service):
     result = memory.get_finished_spans()[0]
     assert result.context.trace_id == int(trace_id, 16)
     assert result.parent.span_id == int(parent_id, 16)
+    provider.shutdown()
+
+
+def test_correlation_spans_have_no_storage_links(service):
+    memory, provider = exporter()
+    with provider.get_tracer("http").start_as_current_span("capture.completion") as span:
+        apply_identity_span_attrs(service.runtime, span, customer_id=7, user_id=42,
+                                  session_id="pascal-session", scope=service.scope)
+    attrs = dict(memory.get_finished_spans()[0].attributes)
+    assert attrs == {
+        "diapason.customer_id": "7", "enduser.id": "42", "diapason.user_id": "42",
+        "diapason.session_id": "pascal-session", "diapason.scope": service.scope,
+    }
     provider.shutdown()

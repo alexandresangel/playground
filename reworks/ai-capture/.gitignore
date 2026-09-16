@@ -21,6 +21,7 @@ data/jwt_revoked.json
 test/test.api.*.json
 
 build/
+.validation/
 dist/
 *.egg-info/
 .coverage

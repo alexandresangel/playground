@@ -26,15 +26,15 @@ class CaptureCatalogTests(unittest.TestCase):
 
     def test_explicit_trade_type(self) -> None:
         cfg = get_trade_type_config("buyDiscountedPaper")
-        self.assertEqual(cfg["prompt_blob"], "prompts/buyDiscountedPaper.txt")
+        self.assertEqual(cfg["prompt_path"], "prompts/buyDiscountedPaper.txt")
 
     def test_default_fallback_for_mlt_loan(self) -> None:
         cfg = get_trade_type_config("mltLoan")
-        self.assertEqual(cfg["prompt_blob"], "prompts/mltLoan.txt")
+        self.assertEqual(cfg["prompt_path"], "prompts/mltLoan.txt")
 
     def test_perpetual_not_default(self) -> None:
         cfg = get_trade_type_config("mltLoanPerpetual")
-        self.assertEqual(cfg["prompt_blob"], "prompts/mltLoanPerpetual.txt")
+        self.assertEqual(cfg["prompt_path"], "prompts/mltLoanPerpetual.txt")
 
     def test_iam_loan_view_entity(self) -> None:
         cfg = get_trade_type_config("iamLoan")
