@@ -4,7 +4,7 @@ config.json
 config.example.json
 test.api.json
 
-# Runtime / deploy (CHAT_CONFIG + JWT_KEYSTORE_P12_B64 at runtime)
+# Runtime / deploy (CHAT_CONFIG at runtime)
 data/
 deploy/
 .github/

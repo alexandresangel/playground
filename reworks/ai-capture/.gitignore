@@ -19,6 +19,9 @@ jwt_keystore.*.p12
 jwt_keystore.p12
 data/jwt_revoked.json
 test/test.api.*.json
+tests/test.api.json
+tests/test.api.*.json
+!tests/test.api.example.json
 
 build/
 dist/

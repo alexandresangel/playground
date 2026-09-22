@@ -23,9 +23,8 @@ class Runtime:
     config: dict
     auth: Any
     get_identity: Callable
-    require_admin: Callable
     require_refresh: Callable
-    require_chat: Callable
+    require_capture: Callable
     tracer: Any = None
 
     def azure_client(self) -> Optional[Dict[str, Any]]:
@@ -50,7 +49,7 @@ def create_runtime(base_dir: Path) -> Runtime:
     logging.getLogger("opentelemetry.exporter.otlp.proto.http._log_exporter").setLevel(
         logging.WARNING
     )
-    # Relocation adapter only: keep local VERSION/config/keystore paths at the project root.
+    # Keep VERSION and local configuration paths at the project root.
     build_info._VERSION_FILE = base_dir / "VERSION"
     try:
         telemetry.init_otel(logger_name="diapason.chat")
@@ -58,10 +57,14 @@ def create_runtime(base_dir: Path) -> Runtime:
     except Exception:
         tracer = None
     config = load_config(base_dir)
-    auth, get_identity, require_admin, require_refresh, require_chat = configure_auth(base_dir, config)
-    if capture_enabled(config):
-        init_capture_prompts(config, base_dir)
-    return Runtime(base_dir, config, auth, get_identity, require_admin, require_refresh, require_chat, tracer)
+    auth, get_identity, require_refresh, require_capture = configure_auth(base_dir, config)
+    try:
+        if capture_enabled(config):
+            init_capture_prompts(config, base_dir)
+    except Exception:
+        auth.close()
+        raise
+    return Runtime(base_dir, config, auth, get_identity, require_refresh, require_capture, tracer)
 
 
 def build_azure_client(config: dict) -> Optional[Dict[str, Any]]:

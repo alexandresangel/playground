@@ -16,7 +16,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --locked --no-dev --no-install-project --no-cache
 
-# Runtime secrets: CHAT_CONFIG + JWT_KEYSTORE_P12_B64 (not baked into the image).
+# Runtime secret: CHAT_CONFIG including registry_url (not baked into the image).
 COPY . .
 # Bundle the complete catalog/prompts directory for direct reads in ACA.
 COPY config/ ./config/

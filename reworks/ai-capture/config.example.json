@@ -1,7 +1,9 @@
 {
-  "jwt": {
-    "keystore_password": "change-me",
-    "revoked": { "jtis": {}, "subs": {} }
+  "registry_url": "https://your-registry.example/registry/services.json",
+  "m2m": {
+    "required_scope": "ai-capture",
+    "jwks_cache_seconds": 600,
+    "jwks_max_stale_seconds": 3600
   },
   "capture": {
     "enabled": true,

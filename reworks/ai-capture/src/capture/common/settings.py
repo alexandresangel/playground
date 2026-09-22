@@ -23,10 +23,13 @@ def load_config(base_dir: Path | None = None) -> dict:
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Invalid JSON in CHAT_CONFIG: {exc}") from exc
     else:
-        path = base / "config.json"
+        local = base / "config.local.json"
+        default = base / "config.json"
+        path = local if local.is_file() else default
         if not path.is_file():
             raise RuntimeError(
-                f"Missing {path}. Copy config.example.json → config.json, "
+                f"Missing {local.name} or {default.name}. "
+                f"Copy config.example.json → config.local.json (preferred) or config.json, "
                 "or set CHAT_CONFIG (Container App secret)."
             )
         try:
@@ -36,6 +39,11 @@ def load_config(base_dir: Path | None = None) -> dict:
 
     if not isinstance(data, dict):
         raise RuntimeError("Config root must be a JSON object.")
+    registry_url = data.get("registry_url")
+    if not isinstance(registry_url, str) or not registry_url.strip():
+        raise RuntimeError(
+            "Missing registry_url in config (required in CHAT_CONFIG / config JSON)."
+        )
     _config = data
     return _config
 

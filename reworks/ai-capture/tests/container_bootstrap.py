@@ -1,9 +1,10 @@
-"""Offline container fixture: real ASGI/JWT/graphs with bundled config and model doubles.
+"""Offline process/container fixture: real ASGI/M2M/graphs and model/MCP doubles.
 
 Mounted only by the migration container check. Never copied into the runtime image.
 """
 
 import importlib
+import os
 from types import SimpleNamespace as NS
 
 from capture.workflow import graph
@@ -42,4 +43,4 @@ app = importlib.import_module("capture.asgi").app
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("PORT", "8000")))

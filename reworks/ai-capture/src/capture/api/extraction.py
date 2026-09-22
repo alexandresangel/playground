@@ -9,7 +9,7 @@ from starlette.responses import Response
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from dia_jwt.fastapi import Identity
+from auth_m2m import Identity
 from capture.observability.http import record_capture_result
 from capture.workflow.prompts import capture_enabled, capture_prompt_version, capture_trade_types
 from capture.runtime import Runtime
@@ -28,12 +28,12 @@ def _ic_public_response(result: Dict[str, Any]) -> Dict[str, Any]:
 def create_router(runtime: Runtime) -> APIRouter:
     router = APIRouter()
     get_identity = runtime.get_identity
-    require_chat = runtime.require_chat
+    require_capture = runtime.require_capture
 
     @router.get("/api/skills/intelligence-contract", deprecated=True)
     @router.get("/api/capture")
     def intelligence_contract_metadata(
-        _claims: dict = Depends(require_chat),
+        _claims: dict = Depends(require_capture),
     ) -> Dict[str, Any]:
         if not capture_enabled(runtime.config):
             raise HTTPException(status_code=404, detail="Intelligence contract skill is disabled")

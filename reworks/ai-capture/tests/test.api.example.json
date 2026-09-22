@@ -1,0 +1,14 @@
+{
+  "capture_url": "http://localhost:8011",
+  "registry_url": "https://your-registry.example/registry/services.json",
+  "m2m_client_id": "capture-test",
+  "m2m_client_secret": "replace-with-client-secret",
+  "diapason_user_id": 1,
+  "diapason_customer_id": 67,
+  "diapason_scope": 22,
+  "diapason_base_url": "https://your-diapason.example",
+  "diapason_client_id": "replace-with-diapason-client-id",
+  "diapason_client_secret": "replace-with-diapason-client-secret",
+  "capture_pdf": "fixtures/sample-loan-contract.pdf",
+  "trade_type": "iamLoan"
+}

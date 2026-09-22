@@ -66,9 +66,9 @@ def test_prompt_paths_cannot_escape_config(local_config):
 def test_refresh_endpoint_uses_runtime_root_and_clears_cache(service, local_config, monkeypatch):
     service.runtime.base_dir = local_config.parent
     monkeypatch.chdir(local_config.parent.parent)
-    token = service.runtime.auth.mint(sub="instance:demo", roles=["refresh"])
-    headers = {"Authorization": "Bearer " + token["access_token"]}
-    assert service.client.post("/api/refresh-prompt", headers=service.headers).status_code == 401
+    headers = {"Authorization": service.headers["Authorization"]}
+    wrong_scope = {"Authorization": "Bearer " + service.mint_token(scope="ai-agent")}
+    assert service.client.post("/api/refresh-prompt", headers=wrong_scope).status_code == 401
     response = service.client.post("/api/refresh-prompt", headers=headers)
     assert response.status_code == 200
     assert response.json() == {"ok": True, "version": "local-1", "source": str(local_config / "catalog.json")}

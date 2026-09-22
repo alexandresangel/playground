@@ -66,15 +66,17 @@ def test_requests_without_correlation_get_independent_ids(service, extraction_ru
     assert run.call_count == client.close.call_count == 2
 
 
-@pytest.mark.parametrize("mutation,status", [("token", 401), ("role", 401), ("customer", 403), ("mcp", 400), ("revoked", 401)])
+@pytest.mark.parametrize("mutation,status", [("token", 401), ("scope", 401), ("customer", 400), ("mcp", 400), ("issuer", 401), ("expired", 401), ("missing", 401)])
 def test_real_auth_rejects_before_workflow(service, extraction_run, mutation, status):
     run, _ = extraction_run
     headers = dict(service.headers)
     if mutation == "token": headers["Authorization"] = "Bearer invalid"
-    if mutation == "role": headers["Authorization"] = "Bearer " + service.runtime.auth.mint(sub="demo", roles=["refresh"])["access_token"]
-    if mutation == "customer": headers["X-Diapason-Customer-Id"] = "8"
+    if mutation == "scope": headers["Authorization"] = "Bearer " + service.mint_token(scope="ai-agent")
+    if mutation == "customer": headers["X-Diapason-Customer-Id"] = "not-an-integer"
     if mutation == "mcp": headers.pop("X-Diapason-Mcp-Token")
-    if mutation == "revoked": service.runtime.auth.revoke(jti=service.token["jti"])
+    if mutation == "issuer": headers["Authorization"] = "Bearer " + service.mint_token(iss="https://wrong.example")
+    if mutation == "expired": headers["Authorization"] = "Bearer " + service.mint_token(exp=1)
+    if mutation == "missing": headers.pop("Authorization")
     assert upload(service, headers=headers).status_code == status
     run.assert_not_called()
 
@@ -88,10 +90,25 @@ def test_workflow_error_status_and_client_cleanup(service, extraction_run, error
     client.close.assert_called_once()
 
 
-def test_metadata_needs_only_chat_role_and_capture_has_no_chat_frontend(service, monkeypatch):
+def test_metadata_needs_only_capture_scope_and_capture_has_no_chat_frontend(service, monkeypatch):
     monkeypatch.setattr(prompts, "_catalog_version", "v1")
     response = service.client.get(PATH, headers={"Authorization": service.headers["Authorization"]})
     assert response.status_code == 200 and response.json()["prompt_version"] == "v1"
     for path in ("/", "/api/chat", "/api/sessions", "/static/index.html"):
         assert service.client.get(path).status_code == 404
     assert service.client.get("/health").json()["status"] == "ok"
+
+
+def test_token_administration_is_owned_by_m2m(service):
+    for path in ("/api/auth/tokens", "/api/auth/revoke"):
+        assert service.client.post(path, headers=service.headers, json={}).status_code == 404
+
+
+def test_m2m_identity_uses_client_id_and_proxy_tenant_headers(service, extraction_run, monkeypatch):
+    record = Mock()
+    monkeypatch.setattr(extraction, "record_capture_result", record)
+    headers = {**service.headers, "X-Diapason-Customer-Id": "8",
+               "Authorization": "Bearer " + service.mint_token(client_id="capture/client")}
+    assert upload(service, headers=headers).status_code == 200
+    identity = record.call_args.kwargs["identity"]
+    assert identity.scope_path == "capture_client/8/42"
