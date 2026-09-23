@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "trade_xml": "<tradeMoneyMarket>\n  <tradeType shortname=\"iamLoan\">763</tradeType>\n  <tradeDate class=\"sql-timestamp\">2023-07-13T00:00:00.000Z</tradeDate>\n  <currency1 shortname=\"EUR\">879</currency1>\n  <amount1>2.2932E+7</amount1>\n  <basis shortname=\"ACT/365\">8</basis>\n  <firstCouponDate class=\"sql-timestamp\">2023-09-30T00:00:00.000Z</firstCouponDate>\n  <firstAmortizationDate class=\"sql-timestamp\">2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <maturityDate class=\"sql-timestamp\">2026-09-06T00:00:00.000Z</maturityDate>\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n  <frequency shortname=\"3M\">255</frequency>\n  <principalFrequency shortname=\"IF\">252</principalFrequency>\n  <amortizationType shortname=\"IF\">247</amortizationType>\n  <interestType shortname=\"Linear\">288</interestType>\n</tradeMoneyMarket>",
+  "view_entity": "loanDeposit",
+  "menu_name": "loanDeposit",
+  "trade_type": "iamLoan",
+  "extracted_field_count": 14,
+  "message": "No id for entity name [TREASURY CENTER]. [Object type : Entity] Found 0 results.\nNo id for cpty name [BNP Paribas]. [Object type : Entity] Found 0 results.",
+  "warnings": [
+    "No id for entity name [TREASURY CENTER]. [Object type : Entity] Found 0 results.",
+    "No id for cpty name [BNP Paribas]. [Object type : Entity] Found 0 results."
+  ],
+  "tool_trace": [
+    {
+      "name": "intelligence-contract",
+      "tool": "extract_xml",
+      "mcp_label": "Intelligence contract",
+      "duration_ms": 2009,
+      "arguments": {
+        "trade_type": "iamLoan",
+        "prompt_path": "prompts/mltLoan.txt"
+      }
+    },
+    {
+      "name": "resolveReferences",
+      "tool": "resolveReferences",
+      "mcp_server": "default",
+      "mcp_label": "Diapason",
+      "duration_ms": 293,
+      "arguments": {
+        "view_entity": "loanDeposit",
+        "menu_name": "loanDeposit",
+        "trade_type": "iamLoan"
+      }
+    }
+  ],
+  "debug": {
+    "extract": {
+      "trade_type": "iamLoan",
+      "prompt_path": "prompts/mltLoan.txt",
+      "deployment": "gpt-5.4-mini",
+      "temperature": 0.5,
+      "pdf_text_length": 3187,
+      "pdf_text_preview": "BNP Paribas\nParis\nTableau d'amortissement par date de flux Date d'impression : 27/06/2024 15:40:12\nCommentaires : TREASURY CENTER\n35 rue chanzy\n75011 - PARIS\nFRANCE\nInstrument Prêts\nEntité de Gestion TREASURY CENTER\nDossier 554637-1 - ********** 132 ACQ A d'un montant de 27 763 000.00 EUR du 13/07/2023 au 06/09/2026\nRef. Synchro : Z712218\nClient CB0904212345 - ********* 132\nLigne 000 - ********** 132 ACQ A d'un montant de 27 763 000.00 EUR du 13/07/2023 au 06/09/2026\nRef. Synchro : D713100\nProduit 62N09ACQUISI - CREDIT D'ACQUISITION\nEnveloppe 002 - Refinancement acquisition d'un montant de 22 932 000.00 EUR du 06/09/2023 au 06/09/2026\nRef. Synchro : C725107\nDate  Déblocage Capital Intérêts Intérêts capitalisés Frais TVA sur frais Total Encours Taux\n07/09/2023 22,932,000.00                   0.00 22,932,000.00                0.00\n30/09/2023 0.00 0.00 89,371.10                                                   89,371.10                      22,932,000.00               6.10\n31/10/2023 0.00 0.00 123,616.22                                                 123,616.22                    22,932,000.00                6.26\n30/11/2023 0.00 0.00 119,437.50                                                 119,437.50                    22,932,000.00                6.25\n31/12/2023 0.00 0.00 123,616.22                                                 123,616.22                    22,932,000.00                6.26\n31/03/2024 0.00 0.00 359,395.40                                                 359,395.40                    22,932,000.00                6.20\n30/06/2024 0.00 0.00 359,975.07                                                 359,975.07                    22,932,000.00                6.21\n30/09/2024 0.00 0.00 353,382.12                                                 353,382.12                    22,932,000.00                6.03\n31/12/2024 0.00 0.00 353,382.12                                                 353,382.12                    22,932,000.00                6.03\n31/03/",
+      "llm_response": "<tradeMoneyMarket gracePeriod=\"\" interestGracePeriod=\"\">\n  <entity name=\"TREASURY CENTER\"/>\n  <cpty name=\"BNP Paribas\"/>\n  <tradeDate>2023-07-13T00:00:00.000Z</tradeDate>\n  <maturityDate>2026-09-06T00:00:00.000Z</maturityDate>\n  <currency1 shortname=\"EUR\"/>\n  <amount1>22932000.00</amount1>\n  <basis shortname=\"ACT/365\"/>\n  <frequency shortname=\"3M\" customDictionaryName=\"frequency\"/>\n  <firstCouponDate>2023-09-30T00:00:00.000Z</firstCouponDate>\n  <principalFrequency shortname=\"IF\" customDictionaryName=\"frequency\"/>\n  <firstAmortizationDate>2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <amortizationType shortname=\"IF\" customDictionaryName=\"amortization\"/>\n  <interestType shortname=\"Linear\" customDictionaryName=\"interestType\"/>\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n</tradeMoneyMarket>",
+      "trade_xml_raw": "<tradeMoneyMarket gracePeriod=\"\" interestGracePeriod=\"\">\n  <entity name=\"TREASURY CENTER\"/>\n  <cpty name=\"BNP Paribas\"/>\n  <tradeDate>2023-07-13T00:00:00.000Z</tradeDate>\n  <maturityDate>2026-09-06T00:00:00.000Z</maturityDate>\n  <currency1 shortname=\"EUR\"/>\n  <amount1>22932000.00</amount1>\n  <basis shortname=\"ACT/365\"/>\n  <frequency shortname=\"3M\" customDictionaryName=\"frequency\"/>\n  <firstCouponDate>2023-09-30T00:00:00.000Z</firstCouponDate>\n  <principalFrequency shortname=\"IF\" customDictionaryName=\"frequency\"/>\n  <firstAmortizationDate>2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <amortizationType shortname=\"IF\" customDictionaryName=\"amortization\"/>\n  <interestType shortname=\"Linear\" customDictionaryName=\"interestType\"/>\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n</tradeMoneyMarket>",
+      "trade_xml": "<tradeMoneyMarket gracePeriod=\"\" interestGracePeriod=\"\">\n  <entity name=\"TREASURY CENTER\" />\n  <cpty name=\"BNP Paribas\" />\n  <tradeDate>2023-07-13T00:00:00.000Z</tradeDate>\n  <maturityDate>2026-09-06T00:00:00.000Z</maturityDate>\n  <currency1 shortname=\"EUR\" />\n  <amount1>22932000.00</amount1>\n  <basis shortname=\"ACT/365\" />\n  <frequency shortname=\"3M\" customDictionaryName=\"frequency\" />\n  <firstCouponDate>2023-09-30T00:00:00.000Z</firstCouponDate>\n  <principalFrequency shortname=\"IF\" customDictionaryName=\"frequency\" />\n  <firstAmortizationDate>2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <amortizationType shortname=\"IF\" customDictionaryName=\"amortization\" />\n  <interestType shortname=\"Linear\" customDictionaryName=\"interestType\" />\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n<tradeType shortname=\"iamLoan\" /></tradeMoneyMarket>"
+    },
+    "resolve_references": {
+      "success": true,
+      "trade_xml": "<tradeMoneyMarket>\n  <tradeType shortname=\"iamLoan\">763</tradeType>\n  <tradeDate class=\"sql-timestamp\">2023-07-13T00:00:00.000Z</tradeDate>\n  <currency1 shortname=\"EUR\">879</currency1>\n  <amount1>2.2932E+7</amount1>\n  <basis shortname=\"ACT/365\">8</basis>\n  <firstCouponDate class=\"sql-timestamp\">2023-09-30T00:00:00.000Z</firstCouponDate>\n  <firstAmortizationDate class=\"sql-timestamp\">2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <maturityDate class=\"sql-timestamp\">2026-09-06T00:00:00.000Z</maturityDate>\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n  <frequency shortname=\"3M\">255</frequency>\n  <principalFrequency shortname=\"IF\">252</principalFrequency>\n  <amortizationType shortname=\"IF\">247</amortizationType>\n  <interestType shortname=\"Linear\">288</interestType>\n</tradeMoneyMarket>",
+      "message": "No id for entity name [TREASURY CENTER]. [Object type : Entity] Found 0 results.\nNo id for cpty name [BNP Paribas]. [Object type : Entity] Found 0 results.",
+      "warnings": [
+        "No id for entity name [TREASURY CENTER]. [Object type : Entity] Found 0 results.",
+        "No id for cpty name [BNP Paribas]. [Object type : Entity] Found 0 results."
+      ],
+      "view_entity": "loanDeposit"
+    },
+    "resolve_references_request": {
+      "view_entity": "loanDeposit",
+      "trade_xml": "<tradeMoneyMarket gracePeriod=\"\" interestGracePeriod=\"\">\n  <entity name=\"TREASURY CENTER\" />\n  <cpty name=\"BNP Paribas\" />\n  <tradeDate>2023-07-13T00:00:00.000Z</tradeDate>\n  <maturityDate>2026-09-06T00:00:00.000Z</maturityDate>\n  <currency1 shortname=\"EUR\" />\n  <amount1>22932000.00</amount1>\n  <basis shortname=\"ACT/365\" />\n  <frequency shortname=\"3M\" customDictionaryName=\"frequency\" />\n  <firstCouponDate>2023-09-30T00:00:00.000Z</firstCouponDate>\n  <principalFrequency shortname=\"IF\" customDictionaryName=\"frequency\" />\n  <firstAmortizationDate>2026-09-06T00:00:00.000Z</firstAmortizationDate>\n  <amortizationType shortname=\"IF\" customDictionaryName=\"amortization\" />\n  <interestType shortname=\"Linear\" customDictionaryName=\"interestType\" />\n  <isFixed>true</isFixed>\n  <fixedRate>6.03</fixedRate>\n<tradeType shortname=\"iamLoan\" /></tradeMoneyMarket>"
+    }
+  }
+}

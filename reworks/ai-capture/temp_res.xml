@@ -1,0 +1,18 @@
+<tradeMoneyMarket gracePeriod=\"\" interestGracePeriod=\"\">
+<entity name=\"TREASURY CENTER\" />
+<cpty name=\"BNP Paribas\" />
+<tradeDate>2023-07-13T00:00:00.000Z</tradeDate>
+<maturityDate>2026-09-06T00:00:00.000Z</maturityDate>
+<currency1 shortname=\"EUR\" />
+<amount1>22932000.00</amount1>
+<basis shortname=\"ACT/365\" />
+<frequency shortname=\"3M\" customDictionaryName=\"frequency\" />
+<firstCouponDate>2023-09-30T00:00:00.000Z</firstCouponDate>
+<principalFrequency shortname=\"IF\" customDictionaryName=\"frequency\" />
+<firstAmortizationDate>2026-09-06T00:00:00.000Z</firstAmortizationDate>
+<amortizationType shortname=\"IF\" customDictionaryName=\"amortization\" />
+<interestType shortname=\"Linear\" customDictionaryName=\"interestType\" />
+<isFixed>true</isFixed>
+<fixedRate>6.03</fixedRate>
+<tradeType shortname=\"iamLoan\" />
+</tradeMoneyMarket>
