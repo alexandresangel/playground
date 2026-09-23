@@ -1,191 +1,111 @@
 # Capture
 
-TODO: write this README for Capture project
+Stateless PDF-to-trade XML extraction using a LangGraph workflow, Azure OpenAI, and the Diapason MCP `resolveReferences` tool. Capture has no chat UI, stored sessions, token minting, or runtime blob-storage dependency.
 
-FastAPI app: agent UI, session storage (Azure Blob), Azure OpenAI tool loop, MCP orchestration, and skills (e.g. intelligence contract).
+## Run and test
 
-**Deploy:** [service-deploy README](../actions/service-deploy/README.md) — GHE registry → Azure Container Apps via `deploy/deploy.sh`.
+```bash
+uv sync --all-groups
+cp config.example.json config.local.json  # once; configure registry, Azure OpenAI and MCP
+uv run --locked pytest -v                # offline; no live credentials required
+bash run.sh --reload                     # localhost:8011; HOST/PORT/PYTHON can override defaults
+```
 
-| Field | Source |
-|-------|--------|
-| `version` | `VERSION` (semver, bump on release) |
-| `revision` | git SHA at Docker build (`IMAGE_TAG`) |
-| `/health` | `{"status":"ok","version":"…","revision":"…"}` |
+The launcher changes to the project root and uses its virtual environment (Linux/macOS or Windows Git Bash). Extra arguments go to Uvicorn. The equivalent direct command is `uv run uvicorn capture.asgi:app --host 0.0.0.0 --port 8011 --reload`.
 
-ACA app / image: **`diapason-agent`**.
+```bash
+curl -s http://localhost:8011/health
+curl -s http://localhost:8011/api/health
+# With Capture running and credentials configured:
+uv run python tests/smoke_capture.py tests/test.api.local.json
+```
 
-## UI
-
-Rhapsody loads `agent-widget.js` in the top bar (`#dia-agent-slot`). Tomcat **`DiapasonAgentChatProxyServlet`** proxies `/agent/*` to this service, injects **`Authorization: Bearer`** (instance chat JWT) and `X-Diapason-*` headers. The browser never receives the chat JWT.
-
-Static assets: `static/index.html` (full chat), `static/agent/agent-widget.js` (launcher + iframe). Strings: `locales/en_us.json`, `locales/fr_fr.json` via `GET /api/i18n`.
+Create the live test config from `tests/test.api.example.json`. The smoke runner checks health/build identity, M2M auth, prompt refresh, metadata, missing-token rejection, PDF extraction, XML, and correlation. It obtains an M2M token with scope `ai-capture` and a Diapason API token using the configured credentials. Static `capture_jwt_token` and `diapason_api_jwt_token` are also supported. It does not print tokens or extracted XML.
 
 ## Configuration
 
-| Where | How |
-|-------|-----|
-| Local | `config.json` (gitignored; copy `config.example.json`); keystore via `jwt_keystore.p12` or `JWT_KEYSTORE_P12_B64` |
-| Azure | Secrets **`CHAT_CONFIG`** + **`JWT_KEYSTORE_P12_B64`** from Infisical |
+`CHAT_CONFIG` remains the deployment JSON environment variable for compatibility with existing infrastructure. It takes precedence over `config.local.json`, then `config.json`. It does not imply chat behavior. Required blocks are `registry_url`, `capture`, `azure_openai`, and `mcp`; `m2m` contains optional validator settings.
 
-Keys: `jwt`, `azure_openai`, `prompt`, `context`, `sessions`, `storage`, `mcp`, `ui`, `intelligence_contract` — see `config.example.json`.
+- M2M issuer comes from `registry_url` -> `services.m2m.url`, with `/token` removed. Capture validates RS256 JWTs using JWKS and requires the exact `ai-capture` scope by default. The issuer identifies the token service, not this application; there is no Capture-local hard-coded issuer or PKCS#12 keystore.
+- Prompts and `catalog.json` live in `config/`, bundled into the image. Optional `capture.catalog_file` selects another catalog relative to that directory. Catalog and prompt paths cannot escape it. `POST /api/refresh-prompt` reloads local files and clears prompt caches.
+- `capture` is canonical. `intelligence_contract` is a compatibility fallback only when `capture` is absent. New configuration should use `capture`.
+- `mcp.default.config_key` is the same Fernet key used by the MCP service. Tenant context headers are encrypted into its outbound bearer token. Capture does not reuse its incoming M2M bearer as MCP authentication.
 
-**Blob containers** (Terraform on shared env storage):
-| Container | Purpose | App RBAC |
-|-----------|---------|----------|
-| `chat-sessions` | Chat history | Blob Data Contributor |
-| `agent-config` | System prompt + per-skill config (IC catalog/prompts, …) | Blob Data Reader |
+## HTTP contract
 
-Set `storage.chat_container` and `storage.config_container` in `CHAT_CONFIG`.
+All shared header names live in [`src/capture/http_contract.py`](src/capture/http_contract.py).
 
-**Config layout** (`agent-config`):
-```
-system_prompt.md
-skills/intelligence-contract/catalog.json
-skills/intelligence-contract/prompts/*.txt
-```
+| Route | Authorization | Purpose |
+|---|---|---|
+| `GET /health`, `GET /api/health` | Public | `status`, `build_date`, `revision`, runtime `release`, compatible `version` |
+| `GET /api/capture` | M2M `ai-capture` | Enabled flag, trade types, prompt version |
+| `POST /api/capture` | M2M plus tenant/MCP headers | Multipart `pdf`, `trade_type`; optional `debug`, `session_id` |
+| `POST /api/refresh-prompt` | M2M `ai-capture` | Reload catalog and prompts |
 
-Override system prompt blob with `prompt.system_prompt_blob` (per-client `CHAT_CONFIG` can point at a different blob). Reload: `POST /api/refresh-prompt` (JWT role **`refresh`**).
+Deprecated GET/POST `/api/skills/intelligence-contract` remain aliases with the same behavior. There are no `/api/chat`, `/api/sessions`, or `/api/auth/*` routes.
 
-**Upload config blobs** (independent of app deploy — no image rebuild):
+| Header | Meaning |
+|---|---|
+| `Authorization: Bearer ...` | Platform M2M access token |
+| `X-Diapason-User-Id`, `X-Diapason-Customer-Id` | Required integer identity fields for extraction |
+| `X-Diapason-Mcp-Token` | Required Diapason API token |
+| `X-Diapason-Mcp-Scope` | Required integer Diapason scope |
+| `X-Diapason-Mcp-Base-Url` | Required Diapason API base URL |
+| `X-Diapason-Mcp-Protocol-Version` | Optional fallback when MCP config has no protocol version |
+| `X-Diapason-Locale` | Shared locale name; currently does not change XML extraction |
+| `X-Diapason-Chat-Session` | Opaque correlation ID; never a session-storage key in Capture |
+| `traceparent`, `tracestate` | Optional W3C distributed trace context |
 
-Uploads `system_prompt.md` and intelligence-contract catalog/prompts into the env’s `agent-config` container. Account/container come from `config.<env>.json` (or `config.json`), or `STORAGE_ACCOUNT_NAME` / `CONFIG_BLOB_CONTAINER`.
+For correlation, a nonempty multipart `session_id` takes precedence over the header; otherwise Capture generates a UUID. API responses echo the correlation header, including handled errors. Browser CORS responses expose it to JavaScript. Direct callers may omit all trace headers.
 
-```bash
-az login   # needs Storage Blob Data Contributor on the config container
-./deploy/deploy-config.sh dev
-./deploy/deploy-config.sh test
-./deploy/deploy-config.sh prod
-# optional overrides: STORAGE_ACCOUNT_NAME=… CONFIG_BLOB_CONTAINER=agent-config CONFIG_JSON=…
-```
+The result contains `success`, `trade_xml`, `view_entity`, `menu_name`, `trade_type`, `extracted_field_count`, `message`, and `warnings`. `tool_trace` is removed from both routes; use OpenTelemetry for timings and tool observability. `debug=true` still explicitly returns extraction/resolver diagnostics, including document-derived content; that content is never added to Capture spans.
 
-After upload, reload the running app: `POST /api/refresh-prompt` with a JWT that has role **`refresh`** (mint with `--role refresh`).
+## Traces and logs
 
-**Docker image:** no secrets; `CHAT_CONFIG` + `JWT_KEYSTORE_P12_B64` at runtime. Sessions and prompts live in Blob.
-
-## Auth
-
-| Token / header | Purpose |
-|----------------|---------|
-| `Authorization: Bearer` (chat JWT) | Chat API (`chat` role) |
-| `X-Diapason-Mcp-Token` | Diapason API JWT → Fernet MCP bearer |
-| `X-Diapason-Mcp-Scope`, `X-Diapason-Mcp-Base-Url` | Tenant context in MCP bearer |
-| `X-Diapason-User-Id`, `X-Diapason-Customer-Id` | Session scope |
-| `X-Diapason-Locale` | UI strings |
-| `X-Diapason-Chat-Session` | Active session id |
-
-Required on API routes except `GET /health`, `GET /api/health`, and `GET /api/i18n`. Details: [`dia_jwt/README.md`](dia_jwt/README.md).
-
-## Local run
-
-UI assets: `frontend/` (esbuild; marked, dompurify, vega) → `static/js/` (gitignored). Build before uvicorn; `deploy/deploy.sh` runs the same step.
-
-```bash
-source /phantom/mcc/configs/env/nodejs
-cd frontend && npm ci && npm run build
-cp config.example.json config.json   # edit azure_openai, mcp, storage; upload system_prompt.md to agent-config
-python3 -m dia_jwt create-keystore --path jwt_keystore.p12
-# optional: export JWT_KEYSTORE_P12_B64="$(base64 -w0 jwt_keystore.p12)"  # else app reads jwt_keystore.p12
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8000
-```
-
-- Health: `curl http://localhost:8000/health`
-- API health: `curl http://localhost:8000/api/health`
-
-### Tests
-
-```bash
-pip install pytest
-pytest test/ -v \
-  --ignore=test/test_agent_smoke.py \
-  --ignore=test/test_tool_route.py \
-  --ignore=test/test_source_extract.py
-# ignored: live API; app-import (config/keystore/blob); source_extract locale filter drift
-
-# Live API (server running):
-cp test/test.api.example.json test/test.api.json   # edit agent_url / jwt / diapason_*
-python test/test_agent_smoke.py
-# or: AGENT_URL=https://… python test/test_agent_smoke.py
-```
-
-## Deploy
-
-App image / ACA: `./deploy/deploy.sh <dev|test|prod>` (see below).
-
-**Content** (prompts / IC catalog — not in the image): `./deploy/deploy-config.sh <dev|test|prod>` after `az login`, then `POST /api/refresh-prompt` (JWT role **`refresh`**). Uses `config.<env>.json` for storage account (e.g. `diapasonprodstor` / `agent-config` for prod).
-
-```bash
-./deploy/deploy.sh <dev|test|prod>
-```
-
-Requires env vars already set (CI or source a local file yourself). Exits if `RESOURCE_GROUP` / Infisical creds are missing.
-
-```bash
-source ../../research/gh/config/diapason-agent/dev.local.sh   # example local file
-az login --service-principal \
-  -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
-az account set --subscription "$AZURE_SUBSCRIPTION_ID"
-./deploy/deploy.sh dev
-```
-
-Infisical path: `/diapason-agent` (env slug = argument):
-
-| Secret | Required | Notes |
-|--------|----------|--------|
-| `CHAT_CONFIG` | yes | Full agent JSON (`storage.account_name` + containers) |
-| `SMOKE_API_CONFIG` | yes (unless `SKIP_SMOKE=1`) | Same shape as `test/test.api.example.json`. Prefer `diapason_client_id` + `diapason_client_secret` (smoke calls `{diapason_base_url}/api/login`); or static `diapason_api_jwt_token`. `agent_url` overridden by deploy via `AGENT_URL`. |
-| `JWT_KEYSTORE_P12_B64` | yes | base64 PKCS#12; ACA secret → env (not in the image). Password in `CHAT_CONFIG.jwt.keystore_password`. Per-env keystores OK. |
-| `GHCR_TOKEN` | yes | Shared at Infisical `/` (same as other services) |
-| `OTEL_EXPORTER_OTLP_*` | for Loki/Tempo | Shared at Infisical `/` — see [service-deploy OTEL](../actions/service-deploy/README.md#opentelemetry-shared--with-ghcr) |
-
-Deploy calls `otel_aca_append` → ACA `OTEL_SERVICE_NAME=diapason-agent-{dev\|test\|prod}`. Local (`dev.local.sh`): `DEPLOY_ENV=len` → `OTEL_SERVICE_NAME=${APP_NAME}-${DEPLOY_ENV}`.
-
-Post-deploy smoke (unless `SKIP_SMOKE=1`): `/health` + image tag + `test/test_agent_smoke.py` (MCP tools, sessions, chat, IC).
-### OpenTelemetry
-
-When `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` / traces endpoints are set, the app exports stdlib logs to Loki and HTTP `/api/*` spans to Tempo. Outbound MCP calls inject W3C `traceparent` so MCP `mcp.tools.call` spans share the same TraceID.
-
-**Chat turn** (span `chat.completion` + one Loki line):
-
-| Signal | Fields |
-|--------|--------|
-| Span / log | `diapason.customer_id`, `enduser.id`, `diapason.session_id`, `diapason.scope` |
-| Preview | `diapason.chat.query_preview` (~120 chars; full text stays in Blob) |
-| Tokens / cost | `gen_ai.usage.*_tokens`, `diapason.chat.cost_usd` |
-| Tools / skills | `diapason.chat.tools`, `diapason.chat.skills` |
-| Blob | `diapason.session_blob_url` → `{account}/chat-sessions/{scope}/{session_id}.json` |
-
-Cost uses `CHAT_CONFIG.azure_openai.input_usd_per_1m` / `output_usd_per_1m` (see `config.example.json`). Defaults to `0` if unset. Usage is also stored on the assistant turn in Blob as `usage: {input, output, total, cost_usd}`.
-
-Loki example:
+Logger and instrumentation scope: `capture` (child loggers `capture.workflow` and `capture.mcp`). Default service name: `ai-capture`, override with `OTEL_SERVICE_NAME`.
 
 ```text
-chat done customer=… user=… session=… tokens_in=… tokens_out=… cost_usd=… tools=Balance,Movements skills=… preview='…' blob=https://…
+caller span (optional)
+  http.request [SERVER]
+    capture.request [identity, correlation, result; covers extraction]
+      ai.capture.workflow
+        ai.capture.validate
+        ai.capture.extract
+          ai.capture.model [CLIENT; model name and token usage]
+        ai.capture.resolve
+          mcp.request [CLIENT; method, tool, server ID/host, HTTP status]
+            MCP service spans (when its exporter is enabled)
+```
+
+Capture extracts incoming W3C context and injects the outgoing MCP client span into HTTP headers. The current Diapason MCP implementation already extracts those headers. Pascal can join the trace by injecting context into its Capture request; a UI without instrumentation starts a new Capture trace. Invalid trace headers are ignored by the propagator. No MCP protocol change is required.
+
+Spans record errors without exception text/stack traces, XML, PDF text, prompts, authentication headers, or tool arguments. A resolver `success=false` marks the workflow and Capture request as failed even when the HTTP result is 200. `diapason.*` identity attributes stay for company dashboard compatibility. LangSmith graph tracing remains disabled around document processing.
+
+Your trace-only Jaeger setup remains supported:
+
+```bash
+# .env.local
+OTEL_SERVICE_NAME=ai-capture-local
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_BSP_SCHEDULE_DELAY=500
 ```
 
 ```bash
-source ../../research/gh/config/diapason-agent/dev.local.sh
-# DEPLOY_ENV=len → OTEL_SERVICE_NAME=diapason-agent-len
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --env-file .env.local uvicorn capture.asgi:app --host 0.0.0.0 --port 8011 --reload
+# Or: bash run.sh --env-file .env.local --reload
 ```
 
-Grafana Loki: `{service_name="diapason-agent-len"}` (local) or `{service_name="diapason-agent-dev"}` (ACA).
+Platform deployment can use `OTEL_EXPORTER_OTLP_ENDPOINT` as a base (Capture appends `/v1/traces` and `/v1/logs`), `OTEL_BEARER_TOKEN`, and `OTEL_ORG_ID` (logs). Signal-specific endpoint URLs are used as-is; a traces-only setting does not enable logs. Signal-specific `*_HEADERS` override common `OTEL_EXPORTER_OTLP_HEADERS`, which override platform credentials. Legacy `OTEL_EXPORTER_OTLP_TOKEN` and `OTEL_EXPORTER_OTLP_SCOPE_ORG_ID` remain fallbacks. Endpoint behavior follows the [OpenTelemetry HTTP exporter configuration](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/).
 
-**Dashboards** (import into folder `Diapason / Agent`): [`observability/grafana-agent-mcp-dev.json`](observability/grafana-agent-mcp-dev.json), [`…-test.json`](observability/grafana-agent-mcp-test.json), [`…-prod.json`](observability/grafana-agent-mcp-prod.json). Datasource UIDs: `loki`, `tempo`. Regenerate: `python observability/generate_dashboards.py`.
+## Deployment
 
-TraceQL (dev):
-
-```traceql
-{resource.service.name="diapason-agent-dev" && name="chat.completion"}
+```bash
+bash deploy/deploy.sh dev
+SKIP_BUILD=1 IMAGE_TAG=<tested-sha> bash deploy/deploy.sh staging
 ```
 
-GitHub **Deploy** (`.github/workflows/deploy.yml`):
+The shared `actions/service-deploy/aca-lib.sh` owns build/push and ACA rollout. Terraform owns the app shell and `CHAT_CONFIG` secret. App/image and Infisical secret path are `ai-capture` and `/ai-capture`. The container keeps port 8000; the deploy script accepts `PORT`. The local launcher defaults to 8011, independently of the agent's 7702 port.
 
-- **dev** (`workflow_dispatch`) — build & push image tagged with the commit SHA, deploy ACA `dev`
-- **test** (`workflow_dispatch` + `image_tag`) — promote that SHA (no rebuild); use the SHA from a successful dev run
-- **prod** — publish a GitHub Release on the same commit; workflow promotes `github.sha`
+Pushes to `main` and manual dev runs build an image; staging and published releases promote an existing SHA. Deployment concurrency is serialized per environment. `BUILD_DATE` and `GIT_REVISION` are baked into the image, and `RELEASE_TAG` is supplied at runtime (empty in dev/staging). The `VERSION` file/package version is retained for compatibility. Post-deploy checks verify health and image tag, then run `tests/smoke_capture.py` using Infisical `SMOKE_API_CONFIG`, unless smoke is explicitly skipped.
 
-Local: `./deploy/deploy.sh dev` (build). Promote: `SKIP_BUILD=1 IMAGE_TAG=<sha> ./deploy/deploy.sh test`.
-
-Redeploy Tomcat after servlet changes (`DiapasonAgentChatProxyServlet`).
+The complete upstream comparison, application decisions, trace assessment, and edit ledger are in [`docs/upstream-sync/README.md`](docs/upstream-sync/README.md).

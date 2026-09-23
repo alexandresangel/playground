@@ -17,6 +17,7 @@ _catalog_source = ""
 _prompt_cache: Dict[str, Tuple[float, str]] = {}
 
 def capture_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    # Read-only compatibility alias for existing deployments; Capture wins.
     block = config.get("capture", config.get("intelligence_contract"))
     return block if isinstance(block, dict) else {}
 
@@ -62,8 +63,11 @@ def _compute_catalog_version(catalog: Dict[str, Any], raw_text: str) -> str:
     return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
 
 
-def _load_catalog(config_dir: Path) -> Tuple[Dict[str, Any], str, str]:
-    path = config_dir / "catalog.json"
+def _load_catalog(config_dir: Path, config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
+    name = str(capture_config(config).get("catalog_file") or "").strip() or "catalog.json"
+    path = (config_dir / name).resolve()
+    if Path(name).is_absolute() or not path.is_relative_to(config_dir.resolve()):
+        raise ValueError("catalog_file must be relative to the Capture config directory")
     raw = _read_text(path)
     catalog = json.loads(raw)
     if not isinstance(catalog, dict):
@@ -76,7 +80,7 @@ def _load_catalog(config_dir: Path) -> Tuple[Dict[str, Any], str, str]:
 def init_capture_prompts(config: Dict[str, Any], base_dir: Path | None = None) -> Dict[str, Any]:
     global _config_dir, _catalog, _catalog_version, _catalog_source, _prompt_cache
     config_dir = (base_dir / "config").resolve() if base_dir is not None else _config_dir.resolve()
-    catalog, version, source = _load_catalog(config_dir)
+    catalog, version, source = _load_catalog(config_dir, config)
     with _lock:
         _config_dir = config_dir
         _catalog = catalog

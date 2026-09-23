@@ -18,22 +18,24 @@ export IMAGE_NAME="$APP_NAME"
 export DEPLOY_ENV="$1"
 export RESOURCE_GROUP="${RESOURCE_GROUP:-diapason-${DEPLOY_ENV}}"
 export SKIP_ACA_REGISTRY_SET=1
+export PORT="${PORT:-8000}"
+export RELEASE_TAG="${RELEASE_TAG:-}"
 
 github_registry_init
 
 service_build_push "$ROOT/Dockerfile" "$ROOT"
-export EXPECTED_VERSION="$(read_version "$ROOT")" EXPECTED_REVISION="$IMAGE_TAG"
+export EXPECTED_REVISION="$IMAGE_TAG"
 
 azure_login
 
-ACA_DEPLOY_ENV_VARS=()
+ACA_DEPLOY_ENV_VARS=("RELEASE_TAG=${RELEASE_TAG}" "PORT=${PORT}")
 ACA_DEPLOY_SECRETS=()
 if [[ -n "${INFISICAL_CLIENT_ID:-}" ]]; then
   infisical_init
   otel_aca_append
 fi
 export ACA_DEPLOY_ENV_VARS ACA_DEPLOY_SECRETS
-service_deploy_app "$APP_NAME" "$IMAGE_REF" 8000 CAPTURE_URL
+service_deploy_app "$APP_NAME" "$IMAGE_REF" "$PORT" CAPTURE_URL
 unset ACA_DEPLOY_ENV_VARS ACA_DEPLOY_SECRETS
 log "deployed $IMAGE_REF → ${ACA_DEPLOY_URL:-}"
 

@@ -3,7 +3,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /bin/uv
 
 WORKDIR /app
 
-ARG APP_VERSION=0.0.0
+ARG APP_VERSION
+ARG BUILD_DATE=unknown
 ARG GIT_REVISION=unknown
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,10 +23,10 @@ COPY . .
 COPY config/ ./config/
 RUN uv sync --locked --no-dev --no-editable --no-cache
 RUN mkdir -p data
-RUN printf '%s\n' "{\"version\":\"${APP_VERSION}\",\"revision\":\"${GIT_REVISION}\"}" \
+RUN printf '%s\n' "{\"version\":\"${APP_VERSION:-$(cat VERSION)}\",\"build_date\":\"${BUILD_DATE}\",\"revision\":\"${GIT_REVISION}\"}" \
     > /app/build-info.json
 
-LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.revision="${GIT_REVISION}"
 
 EXPOSE 8000

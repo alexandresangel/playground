@@ -2,6 +2,7 @@
 
 import json
 import unittest
+import pytest
 from pathlib import Path
 
 
@@ -33,6 +34,17 @@ def test_existing_deployment_settings_still_work():
 def test_empty_capture_settings_do_not_enable_legacy_config():
     assert capture_config({"capture": {}, "intelligence_contract": {"enabled": True}}) == {}
     assert capture_enabled({"capture": {}, "intelligence_contract": {"enabled": True}}) is False
+
+
+def test_custom_catalog_file_stays_inside_config(tmp_path):
+    folder = tmp_path / "config"
+    folder.mkdir()
+    (folder / "custom.json").write_text('{"version":"custom","prompts":{}}')
+    catalog, version, source = capture_prompt_loader._load_catalog(folder, {"capture": {"catalog_file": "custom.json"}})
+    assert version == "custom" and source == str(folder / "custom.json")
+    for path in ("../outside.json", str((tmp_path / "outside.json").resolve())):
+        with pytest.raises(ValueError, match="relative"):
+            capture_prompt_loader._load_catalog(folder, {"capture": {"catalog_file": path}})
 
 
 class CaptureCatalogTests(unittest.TestCase):

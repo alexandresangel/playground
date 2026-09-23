@@ -14,7 +14,7 @@ from auth_setup import configure_auth
 import build_info
 from capture.workflow.prompts import capture_enabled, init_capture_prompts
 
-log = logging.getLogger("diapason.chat")
+log = logging.getLogger("capture")
 
 
 @dataclass
@@ -52,8 +52,8 @@ def create_runtime(base_dir: Path) -> Runtime:
     # Keep VERSION and local configuration paths at the project root.
     build_info._VERSION_FILE = base_dir / "VERSION"
     try:
-        telemetry.init_otel(logger_name="diapason.chat")
-        tracer = telemetry.get_tracer("diapason_agent")
+        telemetry.init_otel(logger_name="capture")
+        tracer = telemetry.get_tracer("capture")
     except Exception:
         tracer = None
     config = load_config(base_dir)

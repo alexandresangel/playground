@@ -44,7 +44,7 @@ def test_new_prefixed_endpoint_errors_are_redacted(service, caplog):
     def future_workflow():
         raise HTTPException(400, "private document content")
     service.app.include_router(router, prefix="/api/v2")
-    caplog.set_level(logging.WARNING, logger="diapason.chat")
+    caplog.set_level(logging.WARNING, logger="capture")
     response = service.client.get("/api/v2/new-workflow")
     assert response.status_code == 400
     assert response.json()["detail"] == "private document content"
@@ -74,4 +74,51 @@ def test_correlation_spans_have_no_storage_links(service):
         "diapason.customer_id": "7", "enduser.id": "42", "diapason.user_id": "42",
         "diapason.session_id": "pascal-session", "diapason.scope": service.scope,
     }
+    provider.shutdown()
+
+
+@pytest.mark.parametrize("response", ["http_error", "rpc_error", "tool_error", "timeout"])
+def test_mcp_failures_are_marked_without_payloads(monkeypatch, response):
+    import httpx
+    import mcp_rpc
+    from mcp_context import McpServerContext
+    from opentelemetry.trace import StatusCode
+    memory, provider = exporter()
+    monkeypatch.setattr(mcp_rpc.trace, "get_tracer", provider.get_tracer)
+    def handler(request):
+        if response == "timeout":
+            raise httpx.ReadTimeout("private content", request=request)
+        if response == "http_error":
+            return httpx.Response(503, text="private content")
+        body = {"error": {"message": "private content"}} if response == "rpc_error" else {
+            "result": {"isError": True, "content": [{"text": "private content"}]},
+        }
+        return httpx.Response(200, json=body)
+    original = httpx.Client
+    monkeypatch.setattr(httpx, "Client", lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
+    with pytest.raises(RuntimeError):
+        mcp_rpc.mcp_call_tool_json(McpServerContext("default", "Diapason", "https://mcp.example/?secret=hidden"), "resolveReferences", {"trade_xml": "private content"})
+    span = memory.get_finished_spans()[0]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes["server.address"] == "mcp.example"
+    assert span.events == () and span.status.description is None
+    assert "private" not in str(span.attributes) and "secret" not in str(span.attributes)
+    provider.shutdown()
+
+
+def test_http_internal_error_sets_error_status(service):
+    from fastapi.testclient import TestClient
+    from opentelemetry.trace import StatusCode
+    memory, provider = exporter()
+    service.runtime.tracer = provider.get_tracer("capture")
+    @service.app.get("/api/broken")
+    def broken():
+        raise RuntimeError("private content")
+    with TestClient(service.app, raise_server_exceptions=False) as client:
+        assert client.get("/api/broken").status_code == 500
+    span = memory.get_finished_spans()[0]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes["http.response.status_code"] == 500
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert span.events == () and span.status.description is None
     provider.shutdown()

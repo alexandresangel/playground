@@ -1,12 +1,12 @@
 """Capture: validate -> extract XML -> resolve references -> shape result.
-There is no checkpointer or external graph tracing yet
+Stage spans use OpenTelemetry; document state is never sent to LangSmith.
 """
 
 from langgraph.graph import END, START, StateGraph
 from typing import Any, TypedDict
 import asyncio
 import logging
-import time
+from opentelemetry.trace import Status, StatusCode
 
 from mcp_context import McpCluster
 from mcp_rpc import mcp_call_tool_json
@@ -15,7 +15,7 @@ from capture.workflow.prompts import capture_config, get_trade_type_config
 from capture.workflow.xml_fields import count_extracted_fields
 from capture.observability.ai import ai_span, private_graph_run
 
-log = logging.getLogger("diapason.chat.ic")  # Existing company logger destination.
+log = logging.getLogger("capture.workflow")
 
 
 class CaptureState(TypedDict, total=False):
@@ -25,9 +25,6 @@ class CaptureState(TypedDict, total=False):
     menu_name: str
     extract: dict[str, Any]
     resolve_body: dict[str, Any]
-    extract_ms: int
-    resolve_ms: int
-    tool_trace: list[dict[str, Any]]
     result: dict[str, Any]
 
 
@@ -42,43 +39,23 @@ def create_capture_graph(*, cluster: McpCluster, config: dict, azure: dict, debu
                 type_cfg.get("view_entity") or capture_config(config).get("view_entity") or "loanDeposit"
             ).strip()
             menu_name = str(type_cfg.get("menu_name") or view_entity).strip()
-            return {"view_entity": view_entity, "menu_name": menu_name, "tool_trace": []}
+            return {"view_entity": view_entity, "menu_name": menu_name}
 
     async def extract(state: CaptureState) -> dict:
         with ai_span("ai.capture.extract"):
-            started = time.perf_counter()
             detail = await asyncio.to_thread(
                 extract_trade_xml_detail, state["pdf_bytes"], state["trade_type"], config, azure
             )
-            duration = int((time.perf_counter() - started) * 1000)
-            entry = {
-                # Keep the existing tool labels in the response contract.
-                "name": "intelligence-contract", "tool": "extract_xml",
-                "mcp_label": "Intelligence contract", "duration_ms": duration,
-                "arguments": {"trade_type": state["trade_type"], "prompt_path": detail.get("prompt_path")},
-            }
-            return {"extract": detail, "extract_ms": duration, "tool_trace": [entry]}
+            return {"extract": detail}
 
     async def resolve(state: CaptureState) -> dict:
-        with ai_span("ai.capture.tool"):
-            started = time.perf_counter()
+        with ai_span("ai.capture.resolve"):
             body = await asyncio.to_thread(
                 mcp_call_tool_json, cluster.diapason, "resolveReferences",
                 {"view_entity": state["view_entity"], "trade_xml": state["extract"]["trade_xml"]},
                 timeout_s=180.0,
             )
-            duration = int((time.perf_counter() - started) * 1000)
-            entry = {
-                "name": "resolveReferences", "tool": "resolveReferences",
-                "mcp_server": cluster.diapason.server_id if cluster.diapason else "default",
-                "mcp_label": cluster.diapason.label if cluster.diapason else "Diapason",
-                "duration_ms": duration, "arguments": {
-                    "view_entity": state["view_entity"], "menu_name": state["menu_name"],
-                    "trade_type": state["trade_type"],
-                },
-            }
-            return {"resolve_body": body, "resolve_ms": duration,
-                    "tool_trace": state["tool_trace"] + [entry]}
+            return {"resolve_body": body}
 
     async def shape_result(state: CaptureState) -> dict:
         body, detail = state["resolve_body"], state["extract"]
@@ -100,8 +77,7 @@ def create_capture_graph(*, cluster: McpCluster, config: dict, azure: dict, debu
             "success": success, "trade_xml": resolved_xml, "view_entity": state["view_entity"],
             "menu_name": state["menu_name"], "trade_type": state["trade_type"],
             "extracted_field_count": count_extracted_fields(resolved_xml) if success else 0,
-            "message": message, "warnings": warnings, "tool_trace": state["tool_trace"],
-            "timings_ms": {"extract": state["extract_ms"], "resolve": state["resolve_ms"]},
+            "message": message, "warnings": warnings,
         }
         if debug:
             result["debug"] = {
@@ -136,6 +112,7 @@ async def run_capture(
         )
         if span and not final["result"]["success"]:
             span.set_attribute("ai.result_success", False)
+            span.set_status(Status(StatusCode.ERROR))
         elif span:
             span.set_attribute("ai.result_success", True)
         return final["result"]

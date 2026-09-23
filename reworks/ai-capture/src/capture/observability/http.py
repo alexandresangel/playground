@@ -2,6 +2,7 @@
 
 from typing import Any, Optional
 import logging
+from opentelemetry.trace import Status, StatusCode
 
 from capture.runtime import Runtime
 
@@ -51,4 +52,6 @@ def record_capture_result(runtime: Runtime, span, *, identity, session_id: str, 
     apply_identity_span_attrs(runtime, span, customer_id=identity.customer_id, user_id=identity.user_id,
                                session_id=session_id, scope=identity.scope_path)
     set_span_attr(span, "ai.result_success", bool(result.get("success")))
-    logging.getLogger("diapason.chat").info("Capture completed success=%s", bool(result.get("success")))
+    if span is not None and not result.get("success"):
+        span.set_status(Status(StatusCode.ERROR))
+    logging.getLogger("capture").info("Capture completed success=%s", bool(result.get("success")))

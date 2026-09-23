@@ -1,4 +1,4 @@
-# Deploy to ACA (m2m / ai-diapason-mcp style): unit tests in ci.yml; manual dev builds, staging/prod promotion.
+# Deploy to ACA: main/manual dev builds, staging/prod promotion; tests in ci.yml.
 #
 # Terraform owns the ACA shell (apps/ai/ai-capture). This workflow builds/pushes and rolls the revision.
 # Capture catalog and prompts are baked into the image (no separate config blob upload).
@@ -37,19 +37,24 @@ permissions: {}
 env:
   GITHUB_REGISTRY: containers.diapason.ghe.com
 
+concurrency:
+  group: deploy-${{ github.event_name == 'release' && 'prod' || github.event_name == 'push' && 'dev' || inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: [self-hosted, linux]
     permissions:
       contents: read
       packages: write
-    environment: ${{ github.event_name == 'release' && 'prod' || inputs.environment }}
+    environment: ${{ github.event_name == 'release' && 'prod' || github.event_name == 'push' && 'dev' || inputs.environment }}
     steps:
       - name: Resolve deploy target
         id: target
         env:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_DRAFT: ${{ github.event.release.draft }}
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
           INPUT_ENVIRONMENT: ${{ inputs.environment }}
           INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
           GIT_SHA: ${{ github.sha }}
@@ -64,6 +69,7 @@ jobs:
             echo "image_tag=$GIT_SHA" >>"$GITHUB_OUTPUT"
             echo "skip_build=1" >>"$GITHUB_OUTPUT"
             echo "checkout_ref=$GIT_SHA" >>"$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG_NAME" >>"$GITHUB_OUTPUT"
           elif [[ "$INPUT_ENVIRONMENT" == staging ]]; then
             tag="$INPUT_IMAGE_TAG"
             tag="${tag#"${tag%%[![:space:]]*}"}"
@@ -106,6 +112,7 @@ jobs:
           DEPLOY_ENV: ${{ steps.target.outputs.env }}
           IMAGE_TAG: ${{ steps.target.outputs.image_tag }}
           SKIP_BUILD: ${{ steps.target.outputs.skip_build }}
+          RELEASE_TAG: ${{ steps.target.outputs.release_tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REGISTRY: ${{ env.GITHUB_REGISTRY }}
           GITHUB_OWNER: ${{ github.repository_owner }}

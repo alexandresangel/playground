@@ -1,4 +1,4 @@
-"""Chat UI and assistant locale: X-Diapason-Locale header, JSON bundles under locales/."""
+"""Diapason locale helpers: X-Diapason-Locale header, JSON bundles under locales/."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
-LOCALE_HEADER = "X-Diapason-Locale"
+from capture.http_contract import LOCALE_HEADER
 DEFAULT_LOCALE = "en_us"
 _LOCALES_DIR = Path(__file__).resolve().parent / "locales"
 _SUPPORTED = frozenset(

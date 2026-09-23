@@ -7,6 +7,7 @@ from typing import Any, Dict
 import io
 import re
 import xml.etree.ElementTree as ET
+from opentelemetry.trace import SpanKind
 
 from telemetry import usage_from_completion
 from capture.workflow.prompts import get_prompt_text, get_trade_type_config, capture_temperature
@@ -85,7 +86,11 @@ def extract_trade_xml_detail(
     client = azure["client"]
     deployment = str(azure["deployment"]).strip()
 
-    with ai_span("ai.capture.model") as span:
+    with ai_span("ai.capture.model", kind=SpanKind.CLIENT, attributes={
+        "gen_ai.provider.name": "azure.ai.openai",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": deployment,
+    }) as span:
         response = client.chat.completions.create(
             model=deployment,
             temperature=capture_temperature(config),

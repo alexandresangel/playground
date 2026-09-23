@@ -1,7 +1,7 @@
 """Content-free AI spans."""
 
 from contextlib import contextmanager, nullcontext
-from opentelemetry.trace import Status, StatusCode
+from opentelemetry.trace import SpanKind, Status, StatusCode
 from time import perf_counter
 
 from telemetry import get_tracer
@@ -16,24 +16,28 @@ def private_graph_run():
 
 
 @contextmanager
-def ai_span(name: str):
+def ai_span(name: str, *, kind=SpanKind.INTERNAL, attributes=None):
     """Callers use fixed stage names; never record exception messages or inputs."""
-    tracer = get_tracer("diapason.ai")
+    tracer = get_tracer("capture")
     cm = tracer.start_as_current_span(
-        name, record_exception=False, set_status_on_exception=False
+        name, kind=kind, attributes=attributes,
+        record_exception=False, set_status_on_exception=False
     ) if tracer else nullcontext()
     started = perf_counter()
     with cm as span:
         outcome = "success"
         try:
             yield span
-        except BaseException:
+        except BaseException as exc:
             outcome = "error"
             if span:
                 span.set_status(Status(StatusCode.ERROR))
+                span.set_attribute("error.type", type(exc).__name__)
             raise
         finally:
             if span:
+                if getattr(getattr(span, "status", None), "status_code", None) == StatusCode.ERROR:
+                    outcome = "error"
                 span.set_attribute("ai.outcome", outcome)
                 span.set_attribute("ai.duration_ms", (perf_counter() - started) * 1000)
 

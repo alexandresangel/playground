@@ -1,11 +1,11 @@
 """
-OpenTelemetry bootstrap for diapason-agent.
+OpenTelemetry bootstrap for Capture.
 
 Goals:
 - Keep app logging API unchanged (still use logging.getLogger(...).info/exception).
 - When OTEL_* log/traces exporters are configured, forward logs to Loki (OTLP logs)
   and traces to Tempo (OTLP traces).
-- W3C Trace Context propagator so agent → MCP (and later Diapason) can share one trace.
+- W3C Trace Context propagator so callers, Capture and MCP can share one trace.
 """
 
 from __future__ import annotations
@@ -41,22 +41,21 @@ def _parse_headers(raw: str) -> Dict[str, str]:
 
 
 def _headers_for(*, logs: bool) -> Dict[str, str]:
-    """Prefer explicit *_HEADERS; else build from OTEL_EXPORTER_OTLP_TOKEN (+ org for logs)."""
+    """Signal headers > common headers > platform auth (legacy aliases supported)."""
     if logs:
         raw = _env("OTEL_EXPORTER_OTLP_LOGS_HEADERS") or _env("OTEL_EXPORTER_OTLP_HEADERS")
     else:
-        raw = _env("OTEL_EXPORTER_OTLP_HEADERS")
+        raw = _env("OTEL_EXPORTER_OTLP_TRACES_HEADERS") or _env("OTEL_EXPORTER_OTLP_HEADERS")
     if raw:
         return _parse_headers(raw)
 
-    token = _env("OTEL_EXPORTER_OTLP_TOKEN")
+    token = _env("OTEL_BEARER_TOKEN") or _env("OTEL_EXPORTER_OTLP_TOKEN")
     if not token:
         return {}
-    auth = f"Authorization=Bearer {token}"
-    if not logs:
-        return _parse_headers(auth)
-    org = _env("OTEL_EXPORTER_OTLP_SCOPE_ORG_ID") or "mcc"
-    return _parse_headers(f"{auth},X-Scope-OrgID={org}")
+    headers = {"Authorization": f"Bearer {token}"}
+    if logs:
+        headers["X-Scope-OrgID"] = _env("OTEL_ORG_ID") or _env("OTEL_EXPORTER_OTLP_SCOPE_ORG_ID") or "mcc"
+    return headers
 
 
 def _resource_from_env() -> object:
@@ -64,7 +63,7 @@ def _resource_from_env() -> object:
     from opentelemetry.sdk.resources import Resource
 
     attrs: Dict[str, str] = {}
-    svc = _env("OTEL_SERVICE_NAME")
+    svc = _env("OTEL_SERVICE_NAME") or "ai-capture"
     if svc:
         attrs["service.name"] = svc
     extra = _env("OTEL_RESOURCE_ATTRIBUTES")
@@ -81,18 +80,31 @@ def _resource_from_env() -> object:
     return Resource.create(attrs or None)
 
 
+def _otlp_signal_url(signal: str) -> str:
+    """Signal endpoints are exact URLs; a common base gains /v1/<signal>."""
+    explicit = _env(f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT")
+    if explicit:
+        return explicit
+    base = _env("OTEL_EXPORTER_OTLP_ENDPOINT").rstrip("/")
+    if not base:
+        return ""
+    # Also accept legacy deployments which put a full signal URL in the base.
+    for suffix in ("/v1/traces", "/v1/logs", "/v1/metrics"):
+        if base.endswith(suffix):
+            base = base[:-len(suffix)]
+            break
+    return f"{base}/v1/{signal}"
+
+
 def _otel_enabled_for_logs() -> bool:
-    return bool(
-        _env("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT")
-        or (_env("OTEL_EXPORTER_OTLP_ENDPOINT") and _env("OTEL_EXPORTER_OTLP_PROTOCOL"))
-    )
+    return bool(_otlp_signal_url("logs"))
 
 
 def _otel_enabled_for_traces() -> bool:
-    return bool(_env("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or _env("OTEL_EXPORTER_OTLP_ENDPOINT"))
+    return bool(_otlp_signal_url("traces"))
 
 
-def init_otel(*, logger_name: str = "diapason_agent") -> None:
+def init_otel(*, logger_name: str = "capture") -> None:
     """
     Initialize OTel SDK if endpoints are configured.
 
@@ -141,9 +153,7 @@ def init_otel(*, logger_name: str = "diapason_agent") -> None:
 
     # Traces — pass full signal URL (exporter does not append /v1/traces when set).
     if _otel_enabled_for_traces():
-        traces_endpoint = _env("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or _env(
-            "OTEL_EXPORTER_OTLP_ENDPOINT"
-        )
+        traces_endpoint = _otlp_signal_url("traces")
         trace_headers = _headers_for(logs=False)
         trace_exporter = OTLPSpanExporter(
             endpoint=traces_endpoint or None,
@@ -158,9 +168,7 @@ def init_otel(*, logger_name: str = "diapason_agent") -> None:
 
     # Logs — pass full signal URL (e.g. .../otlp/v1/logs); exporter POSTs as-is.
     if _otel_enabled_for_logs():
-        logs_endpoint = _env("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT") or _env(
-            "OTEL_EXPORTER_OTLP_ENDPOINT"
-        )
+        logs_endpoint = _otlp_signal_url("logs")
         logs_headers = _headers_for(logs=True)
 
         logger_provider = LoggerProvider(resource=service_resource)
@@ -190,7 +198,7 @@ def init_otel(*, logger_name: str = "diapason_agent") -> None:
     atexit.register(_shutdown)
 
 
-def get_tracer(name: str = "diapason_agent"):
+def get_tracer(name: str = "capture"):
     try:
         from opentelemetry import trace
 
@@ -287,38 +295,3 @@ def estimate_cost_usd(usage: dict, azure_openai_config: dict | None) -> float | 
     except (TypeError, ValueError):
         out_rate = _DEFAULT_OUTPUT_USD_PER_1M
     return (inp * in_rate + out * out_rate) / 1_000_000.0
-
-
-def tools_csv(tool_trace: list | None) -> str:
-    if not tool_trace:
-        return ""
-    names: list[str] = []
-    seen: set[str] = set()
-    for item in tool_trace:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or item.get("tool") or "").strip()
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        names.append(name)
-    return ",".join(names)
-
-
-def skills_csv(skill_run: dict | None, tool_trace: list | None = None) -> str:
-    names: list[str] = []
-    seen: set[str] = set()
-    if isinstance(skill_run, dict):
-        skill = str(skill_run.get("skill") or "").strip()
-        if skill:
-            seen.add(skill)
-            names.append(skill)
-    if tool_trace:
-        for item in tool_trace:
-            if not isinstance(item, dict):
-                continue
-            skill = str(item.get("skill") or "").strip()
-            if skill and skill not in seen:
-                seen.add(skill)
-                names.append(skill)
-    return ",".join(names)
