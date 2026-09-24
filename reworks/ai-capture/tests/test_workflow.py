@@ -48,7 +48,6 @@ def test_pdf_to_xml_and_original_resolver_contract(workflow):
     assert 'shortname="iamLoan"' in args[2]["trade_xml"]
     assert "session_artifacts" not in result
     assert result["debug"]["extract"]["trade_xml"] == args[2]["trade_xml"]
-    assert "tool_trace" not in result and "timings_ms" not in result
     assert result["debug"]["resolve_references_request"] == args[2]
 
 

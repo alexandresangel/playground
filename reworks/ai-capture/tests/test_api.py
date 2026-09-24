@@ -35,7 +35,6 @@ def test_upload_returns_result_without_session_storage(service, extraction_run, 
     response = service.client.post(path, headers=service.headers, data={"trade_type": " iamLoan ", "debug": "yes"}, files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")})
     assert response.status_code == 200
     assert "session_artifacts" not in response.json() and "timings_ms" not in response.json()
-    assert "tool_trace" not in response.json()
     assert not hasattr(service.runtime, "sessions")
     kwargs = run.call_args.kwargs
     assert kwargs["trade_type"] == "iamLoan" and kwargs["debug"] is True and kwargs["pdf_bytes"] == b"%PDF-exact"
@@ -113,22 +112,3 @@ def test_m2m_identity_uses_client_id_and_proxy_tenant_headers(service, extractio
     assert upload(service, headers=headers).status_code == 200
     identity = record.call_args.kwargs["identity"]
     assert identity.scope_path == "capture_client/8/42"
-
-
-def test_browser_can_read_correlation_and_send_trace_context(service, extraction_run):
-    origin = "https://ui.example"
-    preflight = service.client.options("/api/capture", headers={
-        "Origin": origin, "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "authorization,traceparent,tracestate,x-diapason-chat-session",
-    })
-    assert preflight.status_code == 200
-    response = upload(service, headers={**service.headers, "Origin": origin})
-    assert response.status_code == 200
-    assert SESSION.lower() in response.headers["access-control-expose-headers"].lower()
-    assert response.headers[SESSION]
-
-
-def test_error_response_keeps_correlation(service):
-    response = service.client.get("/api/capture", headers={SESSION: "failed-request"})
-    assert response.status_code == 401
-    assert response.headers[SESSION] == "failed-request"

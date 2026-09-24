@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import httpx
 
@@ -23,29 +24,64 @@ from registry_client import m2m_token_url_from_registry
 
 TESTS_DIR = Path(__file__).resolve().parent
 
+_ENV_PLATFORM = "INTEG_PLATFORM_CONFIG"
+_ENV_APP = "INTEG_APP_CONFIG"
+
 
 class SmokeFailure(ValueError):
     """A diagnostic built from fixed labels/status codes, safe to print in CI."""
 
 
-def load_config(path: Path | None = None) -> tuple[dict, Path]:
-    raw = os.getenv("SMOKE_API_CONFIG", "").strip()
-    if raw:
-        config, base = json.loads(raw), TESTS_DIR
+def _parse_json_env(name: str) -> dict[str, Any] | None:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid JSON in {name}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"{name} must be a JSON object.")
+    return data
+
+
+def load_config(config_path: Path | None = None) -> dict[str, Any]:
+    platform = _parse_json_env(_ENV_PLATFORM)
+    app = _parse_json_env(_ENV_APP)
+
+    if platform is not None or app is not None:
+        data = {**(platform or {}), **(app or {})}
+        base = TESTS_DIR  # Path(f"<env:{_ENV_PLATFORM}+{_ENV_APP}>")
     else:
-        local = TESTS_DIR / "test.api.local.json"
-        path = path or (local if local.is_file() else TESTS_DIR / "test.api.json")
-        config, base = json.loads(path.read_text(encoding="utf-8")), path.resolve().parent
-    if not isinstance(config, dict):
-        raise SmokeFailure("Smoke config must be a JSON object")
-    for env, key in (("M2M_CLIENT_ID", "m2m_client_id"), ("M2M_CLIENT_SECRET", "m2m_client_secret"),
-                     ("M2M_TOKEN_URL", "m2m_token_url"), ("REGISTRY_URL", "registry_url")):
-        if os.getenv(env):
-            config[key] = os.environ[env]
-    override = os.getenv("ACA_DEPLOY_URL") or os.getenv("CAPTURE_URL")
-    if override:
-        config["capture_url"] = override.rstrip("/")
-    return config, base
+        config_path = config_path or TESTS_DIR / "test.api.json"
+        if not config_path.is_file():
+            raise SystemExit(
+                f"Missing {config_path} (or set {_ENV_PLATFORM}+{_ENV_APP}). "
+                "Copy tests/integ.platform.example.json + "
+                "tests/integ.app.example.json (or test.api.example.json)."
+            )
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        base = config_path.resolve().parent
+    if not isinstance(data, dict):
+        raise SystemExit("smoke config must be a JSON object.")
+    # Deploy overrides capture_url to the just-deployed ACA URL.
+    capture_url = (
+        (os.environ.get("ACA_DEPLOY_URL") or "").strip()
+        or (os.environ.get("CAPTURE_URL") or "").strip()
+    )
+    if capture_url:
+        data["capture_url"] = capture_url.rstrip("/")
+    # Optional env overrides for m2m client_credentials (CI / local).
+    for env_key, cfg_key in (
+        ("M2M_CLIENT_ID", "m2m_client_id"),
+        ("M2M_CLIENT_SECRET", "m2m_client_secret"),
+        ("M2M_TOKEN_URL", "m2m_token_url"),
+        ("REGISTRY_URL", "registry_url"),
+    ):
+        env_val = (os.environ.get(env_key) or "").strip()
+        if env_val:
+            data[cfg_key] = env_val
+    return data, base
 
 
 def required(config: dict, key: str) -> str:

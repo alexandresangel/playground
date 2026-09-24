@@ -6,7 +6,6 @@ from pathlib import Path
 import build_info
 from capture.api import extraction, health, middleware
 from capture.runtime import Runtime, create_runtime
-from capture.http_contract import EXPOSED_RESPONSE_HEADERS
 
 
 def create_app(base_dir: Path, *, runtime: Runtime | None = None) -> FastAPI:
@@ -29,7 +28,6 @@ def create_app(base_dir: Path, *, runtime: Runtime | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=EXPOSED_RESPONSE_HEADERS,
     )
     for module in (health, extraction):
         app.include_router(module.create_router(runtime))

@@ -1,0 +1,6 @@
+{
+  "capture_url": "https://ai-capture.<env-default-domain>",
+  "registry_url": "https://diapason{env}stor.blob.core.windows.net/registry/services.json?sv=…",
+  "m2m_client_id": "int-test",
+  "m2m_client_secret": "paste-m2m-client-secret"
+}

@@ -12,16 +12,16 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException, Request
 
 from settings import load_config
-from capture.http_contract import (
-    AUTHORIZATION_HEADER, DIAPASON_API_JWT_HEADER, DIAPASON_SCOPE_HEADER,
-    DIAPASON_BASE_URL_HEADER, MCP_VERSION_HEADER,
-)
 
 log = logging.getLogger("capture.mcp")
 
 PRIMARY_SERVER_ID = "default"
 DIAPASON_SERVER_ID = PRIMARY_SERVER_ID
 
+DIAPASON_API_JWT_HEADER = "X-Diapason-Mcp-Token"
+DIAPASON_SCOPE_HEADER = "X-Diapason-Mcp-Scope"
+DIAPASON_BASE_URL_HEADER = "X-Diapason-Mcp-Base-Url"
+MCP_VERSION_HEADER = "X-Diapason-Mcp-Protocol-Version"
 DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 
 _SERVER_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
@@ -153,7 +153,7 @@ def _default_server_from_request(request: Request, block: Dict[str, Any]) -> Mcp
         raise HTTPException(status_code=400, detail=f"{DIAPASON_SCOPE_HEADER} must be an integer") from exc
 
     headers = _parse_request_headers(block)
-    headers[AUTHORIZATION_HEADER] = f"Bearer {_encrypt_diapason_bearer(config_key, diapason_base_url=diapason_base_url, api_token=diapason_api_jwt, scope=scope)}"
+    headers["Authorization"] = f"Bearer {_encrypt_diapason_bearer(config_key, diapason_base_url=diapason_base_url, api_token=diapason_api_jwt, scope=scope)}"
 
     return McpServerContext(
         server_id=PRIMARY_SERVER_ID,

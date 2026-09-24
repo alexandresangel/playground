@@ -18,7 +18,10 @@ config.*.json
 jwt_keystore.*.p12
 jwt_keystore.p12
 data/jwt_revoked.json
-test/test.api.*.json
+# Env-specific integ JSON (secrets); examples stay tracked
+tests/integ.*.json
+!tests/integ.*.example.json
+tests/test.api.*.json
 tests/test.api.json
 tests/test.api.*.json
 !tests/test.api.example.json

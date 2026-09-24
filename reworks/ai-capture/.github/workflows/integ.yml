@@ -1,0 +1,72 @@
+# Post-deploy integration checks (service + live deps). Not deploy smoke (/health).
+#
+# - workflow_dispatch → pick Environment (dev | staging | prod)
+# - workflow_call → invoked after Deploy
+#
+# Needs Environment secrets: INTEG_PLATFORM_CONFIG (TF) + INTEG_APP_CONFIG (manual).
+
+name: Integ
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Target GitHub Environment
+        required: true
+        type: string
+      image_tag:
+        description: Optional IMAGE_TAG for version asserts
+        required: false
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: dev
+
+permissions: {}
+
+concurrency:
+  group: integ-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  integ:
+    runs-on: [self-hosted, linux]
+    permissions:
+      contents: read
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.12.15"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          prune-cache: true
+
+      - name: Install
+        run: uv sync --locked
+
+      - name: Integration tests
+        env:
+          INTEG_PLATFORM_CONFIG: ${{ secrets.INTEG_PLATFORM_CONFIG }}
+          INTEG_APP_CONFIG: ${{ secrets.INTEG_APP_CONFIG }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          : "${INTEG_PLATFORM_CONFIG:?missing Environment secret INTEG_PLATFORM_CONFIG (TF)}"
+          : "${INTEG_APP_CONFIG:?missing Environment secret INTEG_APP_CONFIG (manual)}"
+          uv run --locked --no-sync python test/test_integ.py

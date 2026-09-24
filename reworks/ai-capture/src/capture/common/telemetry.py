@@ -211,7 +211,7 @@ def get_tracer(name: str = "capture"):
 
 QUERY_PREVIEW_MAX = 120
 
-# Placeholder rates when CHAT_CONFIG omits them (ops should set real values).
+# Placeholder rates when CAPTURE_CONFIG omits them (ops should set real values).
 _DEFAULT_INPUT_USD_PER_1M = 0.0
 _DEFAULT_OUTPUT_USD_PER_1M = 0.0
 
@@ -278,7 +278,7 @@ def merge_usage(a: dict, b: dict) -> dict:
 
 
 def estimate_cost_usd(usage: dict, azure_openai_config: dict | None) -> float | None:
-    """Estimate USD from usage + CHAT_CONFIG.azure_openai rates. None if no tokens."""
+    """Estimate USD from usage + CAPTURE_CONFIG.azure_openai rates. None if no tokens."""
     if not usage:
         return None
     inp = int(usage.get("input", 0) or 0)

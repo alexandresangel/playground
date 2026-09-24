@@ -1,4 +1,4 @@
-# Deploy to ACA: main/manual dev builds, staging/prod promotion; tests in ci.yml.
+# Deploy to ACA: unit tests on PR (ci.yml); merge to main builds & rolls dev.
 #
 # Terraform owns the ACA shell (apps/ai/ai-capture). This workflow builds/pushes and rolls the revision.
 # Capture catalog and prompts are baked into the image (no separate config blob upload).
@@ -7,8 +7,10 @@
 # - workflow_dispatch + environment=staging → promote IMAGE_TAG (required; SHA from a successful dev deploy)
 # - release published (not draft)            → promote github.sha to prod
 #
-# GitHub Environments: dev | staging | prod (Azure + Infisical). Smoke needs SMOKE_API_CONFIG
-# in Infisical /ai-capture (m2m Bearer with scope ai-capture).
+# GitHub Environments: dev | staging | prod (Azure + Infisical).
+# Deploy smoke = /health only. Post-deploy integ (test/test_integ.py) runs only when
+# Environment variable INTEG_AFTER_DEPLOY=true (else skip; Integ Action still
+# runnable via workflow_dispatch). Needs INTEG_PLATFORM_CONFIG + INTEG_APP_CONFIG.
 
 name: Deploy
 
@@ -48,6 +50,11 @@ jobs:
       contents: read
       packages: write
     environment: ${{ github.event_name == 'release' && 'prod' || github.event_name == 'push' && 'dev' || inputs.environment }}
+    outputs:
+      env: ${{ steps.target.outputs.env }}
+      image_tag: ${{ steps.target.outputs.image_tag }}
+      checkout_ref: ${{ steps.target.outputs.checkout_ref }}
+      run_integ: ${{ steps.integ_gate.outputs.run_integ }}
     steps:
       - name: Resolve deploy target
         id: target
@@ -89,6 +96,21 @@ jobs:
             echo "checkout_ref=$GIT_SHA" >>"$GITHUB_OUTPUT"
           fi
 
+      - name: Gate post-deploy integ
+        id: integ_gate
+        env:
+          INTEG_AFTER_DEPLOY: ${{ vars.INTEG_AFTER_DEPLOY }}
+        run: |
+          set -euo pipefail
+          v="$(printf '%s' "${INTEG_AFTER_DEPLOY:-}" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$v" == "true" ]]; then
+            echo "run_integ=true" >>"$GITHUB_OUTPUT"
+            echo "INTEG_AFTER_DEPLOY=true → will run integ after deploy"
+          else
+            echo "run_integ=false" >>"$GITHUB_OUTPUT"
+            echo "INTEG_AFTER_DEPLOY=${INTEG_AFTER_DEPLOY:-∅} → smoke only (/health); skip integ"
+          fi
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.target.outputs.checkout_ref }}
@@ -125,3 +147,14 @@ jobs:
 
       - uses: diapason/actions/service-deploy/logout-azure@main
         if: always()
+
+  integ:
+    needs: deploy
+    if: needs.deploy.outputs.run_integ == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/integ.yml
+    with:
+      environment: ${{ needs.deploy.outputs.env }}
+      image_tag: ${{ needs.deploy.outputs.image_tag }}
+    secrets: inherit

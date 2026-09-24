@@ -1,8 +1,4 @@
 {
-  "capture_url": "http://localhost:7703",
-  "registry_url": "https://diapasondevstor.blob.core.windows.net/registry/services.json?sv=…",
-  "m2m_client_id": "int-test",
-  "m2m_client_secret": "paste-m2m-client-secret",
   "diapason_user_id": 1,
   "diapason_customer_id": 67,
   "diapason_scope": 22,
@@ -10,5 +6,6 @@
   "diapason_client_id": "DEMO_API",
   "diapason_client_secret": "paste-api-client-secret",
   "capture_pdf": "fixtures/sample-loan-contract.pdf",
-  "trade_type": "iamLoan"
+  "trade_type": "iamLoan",
+  "capture_debug": false
 }

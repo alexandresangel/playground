@@ -13,7 +13,6 @@ import httpx
 import jwt
 from jwt.algorithms import RSAAlgorithm
 
-from capture.http_contract import CUSTOMER_ID_HEADER, USER_ID_HEADER
 from mcp_context import McpCluster, mcp_from_request
 
 try:
@@ -322,8 +321,8 @@ def m2m_from_config(config: Dict[str, Any]) -> M2MAuth:
 def m2m_deps(
     auth: M2MAuth,
     *,
-    user_header: str = USER_ID_HEADER,
-    customer_header: str = CUSTOMER_ID_HEADER,
+    user_header: str = "X-Diapason-User-Id",
+    customer_header: str = "X-Diapason-Customer-Id",
 ) -> dict:
     bearer = HTTPBearer(auto_error=True)
 

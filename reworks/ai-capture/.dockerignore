@@ -4,7 +4,7 @@ config.json
 config.example.json
 test.api.json
 
-# Runtime / deploy (CHAT_CONFIG at runtime)
+# Runtime / deploy (CAPTURE_CONFIG at runtime)
 data/
 deploy/
 .github/

@@ -1,4 +1,4 @@
-"""Load config.json locally, or CHAT_CONFIG env (ACA secret) at runtime."""
+"""Load config.local.json / config.json locally, or CAPTURE_CONFIG env (ACA secret) at runtime."""
 
 from __future__ import annotations
 
@@ -16,12 +16,12 @@ def load_config(base_dir: Path | None = None) -> dict:
         return _config
 
     base = base_dir or _BASE
-    raw = os.getenv("CHAT_CONFIG", "").strip()
+    raw = os.getenv("CAPTURE_CONFIG", "").strip()
     if raw:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"Invalid JSON in CHAT_CONFIG: {exc}") from exc
+            raise RuntimeError(f"Invalid JSON in CAPTURE_CONFIG: {exc}") from exc
     else:
         local = base / "config.local.json"
         default = base / "config.json"
@@ -30,7 +30,7 @@ def load_config(base_dir: Path | None = None) -> dict:
             raise RuntimeError(
                 f"Missing {local.name} or {default.name}. "
                 f"Copy config.example.json → config.local.json (preferred) or config.json, "
-                "or set CHAT_CONFIG (Container App secret)."
+                "or set CAPTURE_CONFIG (Container App secret)."
             )
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -42,7 +42,7 @@ def load_config(base_dir: Path | None = None) -> dict:
     registry_url = data.get("registry_url")
     if not isinstance(registry_url, str) or not registry_url.strip():
         raise RuntimeError(
-            "Missing registry_url in config (required in CHAT_CONFIG / config JSON)."
+            "Missing registry_url in config (required in CAPTURE_CONFIG / config JSON)."
         )
     _config = data
     return _config

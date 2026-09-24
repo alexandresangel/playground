@@ -12,7 +12,7 @@ from capture.workflow import prompts
 
 def test_capture_startup_loads_only_its_catalog_from_service_root(tmp_path, monkeypatch):
     (tmp_path / "config.json").write_text('{"registry_url": "https://registry.example/services.json", "capture": {"enabled": true}}')
-    monkeypatch.delenv("CHAT_CONFIG", raising=False)
+    monkeypatch.delenv("CAPTURE_CONFIG", raising=False)
     monkeypatch.setattr(settings, "_config", None)
     monkeypatch.setattr(runtime, "configure_auth", lambda *args: (Mock(), None, None, None))
     monkeypatch.setattr(runtime.telemetry, "init_otel", lambda **kwargs: None)
@@ -47,7 +47,7 @@ def test_startup_discovers_registry_and_validates_m2m_without_keystore(tmp_path,
     (tmp_path / "config").mkdir()
     (tmp_path / "config/catalog.json").write_text('{"version":"startup","prompts":{"loan.txt":["iamLoan"]}}')
     monkeypatch.setattr(settings, "_config", None)
-    monkeypatch.delenv("CHAT_CONFIG", raising=False)
+    monkeypatch.delenv("CAPTURE_CONFIG", raising=False)
     monkeypatch.setattr(runtime.telemetry, "init_otel", lambda **kwargs: None)
     for name in ("_config_dir", "_catalog", "_catalog_version", "_catalog_source", "_prompt_cache"):
         monkeypatch.setattr(prompts, name, getattr(prompts, name))

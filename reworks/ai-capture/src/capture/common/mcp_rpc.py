@@ -13,7 +13,6 @@ from typing import Any, Dict, Optional
 import httpx
 
 from mcp_context import McpServerContext
-from capture.http_contract import MCP_PROTOCOL_HEADER
 
 _REQUEST_COUNTER = itertools.count(1)
 
@@ -63,7 +62,7 @@ def mcp_http_headers(server: McpServerContext) -> Dict[str, str]:
     headers = dict(server.request_headers)
     headers.setdefault("Content-Type", "application/json")
     headers.setdefault("Accept", "application/json, text/event-stream")
-    headers.setdefault(MCP_PROTOCOL_HEADER, server.protocol_version)
+    headers.setdefault("MCP-Protocol-Version", server.protocol_version)
     return headers
 
 

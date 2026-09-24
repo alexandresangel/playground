@@ -18,12 +18,12 @@ class RegistryError(Exception):
 
 
 def registry_url_from_config(config: Dict[str, Any]) -> str:
-    """Mandatory ``registry_url`` from CHAT_CONFIG / config JSON only (no env)."""
+    """Mandatory ``registry_url`` from CAPTURE_CONFIG / config JSON only (no env)."""
     raw = config.get("registry_url")
     if isinstance(raw, str) and raw.strip():
         return raw.strip()
     raise RegistryError(
-        "Missing config.registry_url (required in CHAT_CONFIG / config JSON)."
+        "Missing config.registry_url (required in CAPTURE_CONFIG / config JSON)."
     )
 
 

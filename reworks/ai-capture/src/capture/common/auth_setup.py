@@ -1,4 +1,4 @@
-"""Wire m2m JWKS auth from CHAT_CONFIG."""
+"""Wire m2m JWKS auth from CAPTURE_CONFIG."""
 
 from __future__ import annotations
 
