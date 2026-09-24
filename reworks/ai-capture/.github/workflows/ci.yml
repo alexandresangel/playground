@@ -29,5 +29,5 @@ jobs:
       - name: Install
         run: uv sync --locked --group dev
 
-      - name: Unit tests
+      - name: Offline tests (API, LangGraph workflow, and helpers)
         run: uv run --locked --no-sync python -m pytest -v

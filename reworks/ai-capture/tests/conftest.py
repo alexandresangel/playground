@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 import json
 import time
 
@@ -15,6 +16,35 @@ import settings
 from auth_m2m import M2MAuth, m2m_deps
 from capture.application import create_app
 from capture.runtime import Runtime
+from capture.workflow import graph, prompts
+from mcp_context import McpCluster, McpServerContext
+
+
+@pytest.fixture
+def workflow(monkeypatch):
+    """Run the real PDF/LangGraph pipeline with only model and resolver calls faked."""
+    catalog = Path(__file__).resolve().parents[1] / "config/catalog.json"
+    monkeypatch.setattr(prompts, "_catalog", json.loads(catalog.read_text(encoding="utf-8")))
+    monkeypatch.setattr(prompts, "_prompt_cache", {})
+    monkeypatch.setattr(prompts, "_catalog_version", "")
+    monkeypatch.setattr(prompts, "_config_dir", catalog.parent)
+    completion = Mock(return_value=SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content='```xml\n<trade><tradeType shortname="wrong"/><amount>123</amount></trade>\n```'))],
+        usage=SimpleNamespace(prompt_tokens=11, completion_tokens=7, total_tokens=18),
+    ))
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=completion)))
+    resolver = Mock(return_value={
+        "success": True,
+        "trade_xml": '<trade><tradeType shortname="iamLoan"/><amount>123</amount></trade>',
+        "warnings": ["review"],
+    })
+    monkeypatch.setattr(graph, "mcp_call_tool_json", resolver)
+    cluster = McpCluster((McpServerContext("default", "Diapason", "https://mcp.example", {"Authorization": "caller"}),))
+    return SimpleNamespace(
+        config={"capture": {"temperature": 0.5}}, cluster=cluster,
+        azure={"client": client, "deployment": "same-model"},
+        completion=completion, resolver=resolver,
+    )
 
 
 @pytest.fixture(scope="session")

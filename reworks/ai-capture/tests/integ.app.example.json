@@ -6,6 +6,5 @@
   "diapason_client_id": "DEMO_API",
   "diapason_client_secret": "paste-api-client-secret",
   "capture_pdf": "fixtures/sample-loan-contract.pdf",
-  "trade_type": "iamLoan",
-  "capture_debug": false
+  "trade_type": "iamLoan"
 }

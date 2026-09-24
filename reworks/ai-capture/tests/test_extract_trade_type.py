@@ -1,4 +1,4 @@
-"""Unit tests for trade_type enforcement in IC extract XML."""
+"""Capture preserves the requested trade type in model-generated XML."""
 
 from capture.workflow.extract_xml import apply_trade_type_shortname
 

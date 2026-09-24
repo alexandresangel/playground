@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+"""Trade-type catalog compatibility retained from ai-agent's IC catalog tests."""
 
 import json
 import unittest
 from pathlib import Path
-
+from unittest.mock import patch
 
 from capture.workflow import prompts as capture_prompt_loader  # noqa: E402
 from capture.workflow.prompts import get_trade_type_config  # noqa: E402
@@ -36,19 +36,26 @@ def test_empty_capture_settings_do_not_enable_legacy_config():
 
 
 class CaptureCatalogTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
+    def setUp(self) -> None:
+        # Restore prompt state after each test rather than mutating it forever.
         catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-        capture_prompt_loader._catalog.clear()
-        capture_prompt_loader._catalog.update(catalog)
+        catalog_patch = patch.object(capture_prompt_loader, "_catalog", catalog)
+        catalog_patch.start()
+        self.addCleanup(catalog_patch.stop)
 
     def test_explicit_trade_type(self) -> None:
         cfg = get_trade_type_config("buyDiscountedPaper")
         self.assertEqual(cfg["prompt_path"], "prompts/buyDiscountedPaper.txt")
 
-    def test_default_fallback_for_mlt_loan(self) -> None:
+    def test_explicit_mlt_loan_prompt(self) -> None:
         cfg = get_trade_type_config("mltLoan")
         self.assertEqual(cfg["prompt_path"], "prompts/mltLoan.txt")
+
+    def test_unknown_trade_type_uses_catalog_defaults(self) -> None:
+        cfg = get_trade_type_config("customLoan")
+        self.assertEqual(cfg["prompt_path"], "prompts/mltLoan.txt")
+        self.assertEqual(cfg["view_entity"], "loanDeposit")
+        self.assertEqual(cfg["menu_name"], "loanDeposit")
 
     def test_perpetual_not_default(self) -> None:
         cfg = get_trade_type_config("mltLoanPerpetual")

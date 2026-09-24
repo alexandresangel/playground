@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build/push (or promote) image, then roll ACA. TF owns shell + secrets.
-# Smoke = /health gate only. integ lives in test/test_integ.py (separate Action).
+# Smoke = /health gate only. integ lives in tests/test_integ.py (separate Action).
 set -euo pipefail
 
 usage() { echo "Usage: $0 <dev|staging|prod>" >&2; exit 1; }

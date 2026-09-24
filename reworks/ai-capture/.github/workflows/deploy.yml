@@ -1,4 +1,4 @@
-# Deploy to ACA: unit tests on PR (ci.yml); merge to main builds & rolls dev.
+# Deploy to ACA: offline tests before deployment; merge to main builds & rolls dev.
 #
 # Terraform owns the ACA shell (apps/ai/ai-capture). This workflow builds/pushes and rolls the revision.
 # Capture catalog and prompts are baked into the image (no separate config blob upload).
@@ -8,7 +8,7 @@
 # - release published (not draft)            → promote github.sha to prod
 #
 # GitHub Environments: dev | staging | prod (Azure + Infisical).
-# Deploy smoke = /health only. Post-deploy integ (test/test_integ.py) runs only when
+# Deploy smoke = /health only. Post-deploy integ (tests/test_integ.py) runs only when
 # Environment variable INTEG_AFTER_DEPLOY=true (else skip; Integ Action still
 # runnable via workflow_dispatch). Needs INTEG_PLATFORM_CONFIG + INTEG_APP_CONFIG.
 
@@ -116,11 +116,16 @@ jobs:
           ref: ${{ steps.target.outputs.checkout_ref }}
           persist-credentials: false
 
-      - name: Set up uv and Python for smoke checks
+      - name: Set up uv and Python
         uses: astral-sh/setup-uv@v10.1.0
         with:
           version: "0.12.15"
           python-version: "3.12"
+
+      - name: Offline tests before deployment
+        run: |
+          uv sync --locked --group dev
+          uv run --locked --no-sync python -m pytest -v
 
       - uses: diapason/actions/service-deploy/login-azure@main
         with:
@@ -157,4 +162,5 @@ jobs:
     with:
       environment: ${{ needs.deploy.outputs.env }}
       image_tag: ${{ needs.deploy.outputs.image_tag }}
+      checkout_ref: ${{ needs.deploy.outputs.checkout_ref }}
     secrets: inherit

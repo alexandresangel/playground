@@ -46,24 +46,3 @@ def load_config(base_dir: Path | None = None) -> dict:
         )
     _config = data
     return _config
-
-
-def assistant_name(config: dict | None = None) -> str:
-    cfg = config if config is not None else load_config()
-    ui = cfg.get("ui") if isinstance(cfg.get("ui"), dict) else {}
-    name = str(ui.get("assistant_name", "Pascal") or "").strip()
-    return name or "Pascal"
-
-
-def assistant_identity(config: dict | None = None) -> str:
-    """Persona for the LLM (separate from BI system_prompt)."""
-    cfg = config if config is not None else load_config()
-    ui = cfg.get("ui") if isinstance(cfg.get("ui"), dict) else {}
-    return str(ui.get("assistant_identity", "") or "").strip()
-
-
-def assistant_identity_llm_block(config: dict | None = None) -> str:
-    text = assistant_identity(config)
-    if not text:
-        return ""
-    return f"\n\n---\n**Assistant identity:**\n{text}\n"

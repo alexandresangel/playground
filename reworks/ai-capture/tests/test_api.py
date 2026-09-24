@@ -1,3 +1,5 @@
+"""Capture's HTTP/auth contract; workflow behavior lives in test_workflow.py."""
+
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -7,7 +9,7 @@ import json
 from capture.api import extraction
 from capture.workflow import prompts
 
-PATH = "/api/skills/intelligence-contract"
+PATH = "/api/capture"
 SESSION = "X-Diapason-Chat-Session"
 
 
@@ -29,7 +31,7 @@ def upload(service, **kwargs):
     return service.client.post(PATH, headers=kwargs.pop("headers", service.headers), data=kwargs.pop("data", {"trade_type": " iamLoan ", "debug": "yes"}), files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")}, **kwargs)
 
 
-@pytest.mark.parametrize("path", [PATH, "/api/capture"])
+@pytest.mark.parametrize("path", [PATH, "/api/skills/intelligence-contract"])
 def test_upload_returns_result_without_session_storage(service, extraction_run, path):
     run, client = extraction_run
     response = service.client.post(path, headers=service.headers, data={"trade_type": " iamLoan ", "debug": "yes"}, files={"pdf": ("contract.pdf", b"%PDF-exact", "application/pdf")})

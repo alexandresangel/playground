@@ -3,6 +3,8 @@ tests/
 config.json
 config.example.json
 test.api.json
+temp_res*.json
+temp_res*.xml
 
 # Runtime / deploy (CAPTURE_CONFIG at runtime)
 data/

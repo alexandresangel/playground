@@ -33,17 +33,13 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["capture", "capture.api", "capture.observability", "capture.workflow", "locales"]
-py-modules = ["auth_m2m", "auth_setup", "build_info", "i18n", "mcp_context", "mcp_rpc", "registry_client", "settings", "telemetry"]
+packages = ["capture", "capture.api", "capture.observability", "capture.workflow"]
+py-modules = ["auth_m2m", "auth_setup", "build_info", "mcp_context", "mcp_rpc", "registry_client", "settings", "telemetry"]
 include-package-data = false
 
 [tool.setuptools.package-dir]
 "" = "src/capture/common"
 "capture" = "src/capture"
-"locales" = "src/capture/common/locales"
-
-[tool.setuptools.package-data]
-locales = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

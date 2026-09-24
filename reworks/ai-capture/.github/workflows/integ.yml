@@ -19,6 +19,11 @@ on:
         required: false
         type: string
         default: ""
+      checkout_ref:
+        description: Commit used to build the deployed image
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       environment:
@@ -46,6 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.checkout_ref }}
           persist-credentials: false
 
       - name: Set up uv and Python
@@ -69,4 +75,4 @@ jobs:
           set -euo pipefail
           : "${INTEG_PLATFORM_CONFIG:?missing Environment secret INTEG_PLATFORM_CONFIG (TF)}"
           : "${INTEG_APP_CONFIG:?missing Environment secret INTEG_APP_CONFIG (manual)}"
-          uv run --locked --no-sync python test/test_integ.py
+          uv run --locked --no-sync python tests/test_integ.py
