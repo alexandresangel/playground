@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 """Opt-in integration checks against a running Capture HTTP API.
 
-Run with ``uv run --locked python tests/test_integ.py [path/to/test.api.json]``.
-Like ai-agent, configuration comes from INTEG_PLATFORM_CONFIG + INTEG_APP_CONFIG,
-the legacy SMOKE_API_CONFIG JSON blob, or tests/test.api.json, in that order.
-ACA_DEPLOY_URL / CAPTURE_URL override capture_url. PDF paths may be relative to
-the config file, repository root, or tests/. The bundled PDF is the default;
-ai-agent's intelligence_contract_pdf key and test/ path prefix are also accepted.
+Config: test.api.json, path arg, or env merge of INTEG_PLATFORM_CONFIG +
+INTEG_APP_CONFIG (GitHub Environment secrets)
 
-This script always exercises PDF extraction with debug=true, so it can verify
-the requested trade type before reference resolution replaces it with an ID.
-Document contents and credentials are never printed. Importing this module or
-running pytest does not make live requests; only direct execution does.
+    uv run --locked python tests/test_integ.py
 """
 
 from __future__ import annotations
@@ -26,7 +19,7 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
-# Match ai-agent's directly executable test script, including uninstalled checkouts.
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 for _source_dir in (_REPO_ROOT / "src", _REPO_ROOT / "src/capture/common"):
     if str(_source_dir) not in sys.path:
@@ -70,6 +63,7 @@ def load_config(config_path: Path | None = None) -> tuple[dict[str, Any], Path]:
     platform = _parse_json_env(_ENV_PLATFORM)
     app = _parse_json_env(_ENV_APP)
     base = TESTS_DIR
+
     if platform is not None or app is not None:
         data = {**(platform or {}), **(app or {})}
     elif (legacy := _parse_json_env("SMOKE_API_CONFIG")) is not None:
@@ -83,12 +77,13 @@ def load_config(config_path: Path | None = None) -> tuple[dict[str, Any], Path]:
             )
         data = _json_config(config_path.read_text(encoding="utf-8"), "Integration config file")
         base = config_path.resolve().parent
-
+    # Deploy overrides agent_url to the just-deployed ACA URL.
     capture_url = (os.environ.get("ACA_DEPLOY_URL") or "").strip() or (
         os.environ.get("CAPTURE_URL") or ""
     ).strip()
     if capture_url:
         data["capture_url"] = capture_url.rstrip("/")
+    # Optional env overrides for m2m client_credentials (CI / local).
     for env_key, config_key in (
         ("M2M_CLIENT_ID", "m2m_client_id"),
         ("M2M_CLIENT_SECRET", "m2m_client_secret"),
@@ -187,7 +182,10 @@ def check_health(client: httpx.Client, url: str) -> None:
         raise IntegrationFailure(f"GET {route}: deployed revision does not match")
     if "RELEASE_TAG" in os.environ and health["release"] != os.environ["RELEASE_TAG"]:
         raise IntegrationFailure(f"GET {route}: deployed release does not match")
-    print(f"OK  GET {route} (health and build identity)")
+    print(
+        f"OK  GET {route}", f"build_date={health['build_date']!r}",
+        f"revision={health['revision']!r}", f"release={health['release']!r}",
+    )
 
 
 def check_metadata(client: httpx.Client, url: str, auth: dict) -> dict:
@@ -203,7 +201,12 @@ def check_metadata(client: httpx.Client, url: str, auth: dict) -> dict:
         raise IntegrationFailure("GET /api/capture: expected non-empty trade_types array")
     if not isinstance(metadata["prompt_version"], str) or not metadata["prompt_version"].strip():
         raise IntegrationFailure("GET /api/capture: missing prompt_version")
-    print("OK  GET /api/capture (trade types and prompt version)")
+    print(
+        "OK  GET /api/capture", f"trade_types={len(trade_types)}",
+        f"prompt_version={metadata['prompt_version']!r}",
+    )
+    for trade_type in trade_types:
+        print(f"  - {trade_type}")
     return metadata
 
 
@@ -228,28 +231,78 @@ def _trade_types(xml: str, label: str) -> list[ET.Element]:
     return [element for element in root.iter() if element.tag.rsplit("}", 1)[-1].lower() == "tradetype"]
 
 
-def check_capture_result(result: dict, trade_type: str) -> None:
-    resolved_xml = result.get("trade_xml")
-    if result.get("success") is not True or not isinstance(resolved_xml, str) or not resolved_xml.strip():
-        raise IntegrationFailure("Capture extraction did not produce resolved XML")
-    if not _trade_types(resolved_xml, "Resolved trade_xml"):
-        raise IntegrationFailure("Resolved trade_xml has no tradeType element")
+def _capture_source_trade_xml(result: dict) -> str:
     debug = result.get("debug")
-    source = ""
     if isinstance(debug, dict):
         for key in ("extract", "resolve_references_request"):
             detail = debug.get(key)
             if isinstance(detail, dict) and isinstance(detail.get("trade_xml"), str):
                 source = detail["trade_xml"].strip()
                 if source:
-                    break
+                    return source
+    return ""
+
+
+def _print_capture_debug(result: dict) -> None:
+    """Match ai-agent's extraction/resolver diagnostics without dumping auth/config."""
+    debug = result.get("debug")
+    if not isinstance(debug, dict):
+        return
+    print("\n--- debug ---")
+    extract = debug.get("extract")
+    if isinstance(extract, dict):
+        for key, label in (
+            ("llm_response", "llm_response"),
+            ("trade_xml_raw", "xml_from_llm"),
+            ("trade_xml", "xml_with_trade_type_injected"),
+        ):
+            if extract.get(key):
+                print(f"\n[{label}]")
+                print(extract[key])
+    resolve = debug.get("resolve_references")
+    if resolve is not None:
+        print("\n[resolve_references_result]")
+        print(json.dumps(resolve, indent=2, ensure_ascii=False))
+    request = debug.get("resolve_references_request")
+    if isinstance(request, dict) and request.get("trade_xml"):
+        print("\n[xml_sent_to_resolve]")
+        print(request["trade_xml"])
+
+
+def check_capture_result(result: dict, trade_type: str) -> None:
+    resolved_xml = result.get("trade_xml")
+    resolved_text = resolved_xml.strip() if isinstance(resolved_xml, str) else ""
+    source = _capture_source_trade_xml(result)
+    # Print before asserting: failed extraction/resolution needs the same diagnostics.
+    print(f"POST /api/capture result: success={result.get('success')}")
+    if result.get("message"):
+        print("  message:", result["message"])
+    if result.get("warnings"):
+        print("  warnings:", result["warnings"])
+    print(
+        f"  view_entity={result.get('view_entity')!r} menu_name={result.get('menu_name')!r} "
+        f"trade_type={trade_type!r} extracted_field_count={result.get('extracted_field_count')!r} "
+        f"trade_xml_len={len(resolved_text)} source_trade_xml_len={len(source)}"
+    )
+    if "tool_trace" in result:
+        print("\n[tool_trace]")
+        print(json.dumps(result["tool_trace"], indent=2, ensure_ascii=False))
+    _print_capture_debug(result)
+    print("\n--- source trade_xml (first 1500 chars) ---")
+    print(source[:1500])
+    print("\n--- resolved trade_xml (first 1500 chars) ---")
+    print(resolved_text[:1500])
+
+    if result.get("success") is not True or not resolved_text:
+        raise IntegrationFailure("Capture extraction did not produce resolved XML")
+    if not _trade_types(resolved_text, "Resolved trade_xml"):
+        raise IntegrationFailure("Resolved trade_xml has no tradeType element")
     if not source:
         raise IntegrationFailure("Capture debug response missing source trade_xml")
     if not any(element.get("shortname") == trade_type or (element.text or "").strip() == trade_type
                for element in _trade_types(source, "Source trade_xml")):
-        raise IntegrationFailure("Source trade_xml does not contain the requested trade_type")
-    if "tool_trace" in result or "timings_ms" in result:
-        raise IntegrationFailure("Capture returned legacy tracing fields")
+        raise IntegrationFailure(f"Source trade_xml does not contain the requested trade_type {trade_type!r}")
+    print(f"  OK  trade_type {trade_type!r} present in source trade_xml")
 
 
 def run_integration(config: dict, base: Path, client: httpx.Client) -> None:
@@ -272,7 +325,10 @@ def run_integration(config: dict, base: Path, client: httpx.Client) -> None:
         raise IntegrationFailure("Configured trade_type is not in the Capture catalog")
     if client.get(url + "/api/capture").status_code not in (401, 403):
         raise IntegrationFailure("GET /api/capture: missing-token request was not rejected")
-    print("OK  GET /api/capture rejects missing Bearer token")
+    print(
+        f"-> POST /api/capture pdf={pdf} trade_type={trade_type!r} timeout={CAPTURE_TIMEOUT_S:.0f}s",
+        flush=True,
+    )
     with pdf.open("rb") as pdf_file:
         response = client.post(
             url + "/api/capture", headers=headers,
@@ -282,6 +338,7 @@ def run_integration(config: dict, base: Path, client: httpx.Client) -> None:
     check_capture_result(check(response, "POST /api/capture"), trade_type)
     if response.headers.get(CORRELATION_HEADER) != "capture-integ":
         raise IntegrationFailure("Capture did not preserve correlation")
+    print(f"  OK  correlation={response.headers[CORRELATION_HEADER]!r}")
     print("OK  POST /api/capture (PDF extraction, source trade type, resolved XML, correlation)")
     print("All Capture integration checks passed.")
 

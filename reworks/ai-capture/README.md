@@ -2,8 +2,6 @@
 
 FastAPI app: PDF-to-trade-XML extraction, LangGraph workflow, Azure OpenAI, Diapason MCP `resolveReferences` tool. Stateless — no chat UI, no stored sessions, no token minting, no runtime blob-storage dependency.
 
-Callers such as `ai-agent` use the classic HTTP `POST /api/capture` endpoint. Capture calls Diapason MCP internally only to resolve the extracted references.
-
 **Deploy:** Terraform owns the Azure shell (`apps/ai/ai-capture`); GitHub Actions `deploy/deploy.sh` builds/pushes the image and rolls the ACA revision (same pattern as m2m / ai-diapason-mcp / ai-agent). See [service-deploy HOW-IT-WORKS](../actions/service-deploy/HOW-IT-WORKS.md).
 
 | Field | Source |
@@ -87,38 +85,20 @@ The equivalent direct command is `uv run uvicorn capture.asgi:app --host 0.0.0.0
 
 ### Tests
 
-The default suite is offline, including when integration configuration is present in the environment:
-
 ```bash
 uv run --locked pytest -v
 ```
 
-| Tests | What they verify |
-|-------|------------------|
-| `test_workflow.py` | Real PDF parsing and compiled LangGraph: validation → extraction → reference resolution → result; Azure model and resolver calls are mocked |
-| `test_api.py` | HTTP upload, M2M/tenant headers, correlation, errors and the deprecated route alias |
-| `test_workflow_tracing.py` | HTTP → graph → model → MCP trace propagation and privacy, with mocked transport |
-| `test_capture_catalog.py`, `test_local_config.py` | Trade-type routing, prompt loading, reload/cache behavior and local file boundaries |
-| `test_integration_runner.py` | The live runner's config/auth/request/assertion logic using `httpx.MockTransport` |
-| Other `test_*.py` files | Runtime startup, auth/JWKS, registry, MCP context, XML helpers and telemetry |
-
-`tests/test_integ.py` is the explicit live runner, following `ai-agent/test/test_integ.py`. Start Capture separately, then run it from the project root on a machine with access to the configured services:
-
 ```bash
-# Once: copy the examples and fill in the local URLs and credentials.
-cp tests/integ.app.example.json tests/integ.app.pascal-dev.json
-cp tests/integ.platform.example.json tests/integ.platform.local.json
+# Live integ (server running; not part of deploy):
+cp tests/integ.platform.example.json tests/integ.app.example.json …
 
 export INTEG_APP_CONFIG="$(cat tests/integ.app.pascal-dev.json)"
 export INTEG_PLATFORM_CONFIG="$(cat tests/integ.platform.local.json)"
 uv run --locked python tests/test_integ.py
 ```
 
-With the virtual environment activated, the last line can be `python tests/test_integ.py`, as in `ai-agent`. The runner merges platform config first, then app config. It also accepts an explicit JSON file argument or `tests/test.api.json`, plus the legacy `SMOKE_API_CONFIG` JSON environment variable. `ACA_DEPLOY_URL` / `CAPTURE_URL` override `capture_url`.
-
-Extraction always runs. `capture_pdf` defaults to the bundled sample; the old `intelligence_contract_pdf` key and `test/fixtures/...` path are accepted for reused `ai-agent` app configs. `smoke_capture.py` is a compatibility entry point to this same runner.
-
-Checks health/build identity, M2M auth, metadata, missing-token rejection, PDF extraction, source/resolved XML and correlation through `/api/capture`. Like `ai-agent`, M2M client credentials omit `scope` so the client's configured scopes are granted; those scopes must include `ai-capture`. Diapason credentials obtain the API token via `/api/login`. Static `capture_jwt_token` and `diapason_api_jwt_token` are also supported. The runner requests `debug=true` to check the selected trade type before reference resolution; resolved XML may contain its numeric ID. Tokens and document XML are not printed.
+Checks health/build identity, M2M auth, prompt refresh, metadata, missing-token rejection, PDF extraction, XML, correlation. Obtains an M2M token with scope `ai-capture` and a Diapason API token from the configured credentials. Static `capture_jwt_token` and `diapason_api_jwt_token` are also supported.
 
 ## Deploy
 
@@ -140,9 +120,7 @@ Requires Azure + GHE registry env (CI or source a local file). Infisical is opti
 | `OTEL_*` | TF bootstrap + `otel_aca_append` | Path A: Infisical `/platform` endpoint/org; bearer secret on ACA |
 | `RELEASE_TAG` | prod release only | Set on ACA; appears in `/health.release` |
 
-Pushes to `main` and manual dev runs build an image; staging and published releases promote an existing SHA. The deploy Action runs offline tests at that commit before Azure login/deployment. `BUILD_DATE` and `GIT_REVISION` are baked into the image; `RELEASE_TAG` is supplied at runtime (empty in dev/staging). Post-deploy smoke checks verify health and image tag (`SKIP_SMOKE=1` skips these checks).
-
-Live integration is a separate **Integ** Action using `INTEG_PLATFORM_CONFIG` and `INTEG_APP_CONFIG` environment secrets. Run it manually, or set the GitHub Environment variable `INTEG_AFTER_DEPLOY=true` to run it after deployment against the deployed commit and expected image revision. It is not part of ordinary pytest or health smoke checks.
+Pushes to `main` and manual dev runs build an image; staging and published releases promote an existing SHA. `BUILD_DATE` and `GIT_REVISION` are baked into the image; `RELEASE_TAG` is supplied at runtime (empty in dev/staging).
 
 ## Traces and logs
 
@@ -167,21 +145,22 @@ Spans record errors without exception text/stack traces, XML, PDF text, prompts,
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` is the base (Capture appends `/v1/traces` and `/v1/logs`), plus `OTEL_BEARER_TOKEN` and `OTEL_ORG_ID` (logs). Signal-specific endpoint URLs are used as-is — a traces-only setting doesn't enable logs. Signal-specific `*_HEADERS` override common `OTEL_EXPORTER_OTLP_HEADERS`, which override platform credentials. Legacy `OTEL_EXPORTER_OTLP_TOKEN` / `OTEL_EXPORTER_OTLP_SCOPE_ORG_ID` remain fallbacks. See [OpenTelemetry OTLP exporter configuration](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/).
 
-For local dev/test, you can also use a local OTel listener like Jaeger:
+To verify traces, logs, and metrics locally:
 
 ```bash
 docker run -d \
-  --name jaeger \
-  -p 16686:16686 \
+  --name otel-lgtm \
+  -p 3000:3000 \
   -p 4317:4317 \
   -p 4318:4318 \
-  jaegertracing/all-in-one:latest
+  docker.io/grafana/otel-lgtm:latest
 ```
+Grafana UI: http://localhost:3000 (User: admin / Password: admin)
 
 ```bash
 # .env.local
 OTEL_SERVICE_NAME=ai-capture-local
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_BSP_SCHEDULE_DELAY=500
 ```
 

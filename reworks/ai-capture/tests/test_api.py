@@ -1,5 +1,3 @@
-"""Capture's HTTP/auth contract; workflow behavior lives in test_workflow.py."""
-
 from unittest.mock import AsyncMock, Mock
 
 import pytest

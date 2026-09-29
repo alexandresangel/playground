@@ -1,4 +1,4 @@
-# Deploy to ACA: offline tests before deployment; merge to main builds & rolls dev.
+# Deploy to ACA: unit tests on PR (ci.yml); merge to main builds & rolls dev.
 #
 # Terraform owns the ACA shell (apps/ai/ai-capture). This workflow builds/pushes and rolls the revision.
 # Capture catalog and prompts are baked into the image (no separate config blob upload).
@@ -111,21 +111,15 @@ jobs:
             echo "INTEG_AFTER_DEPLOY=${INTEG_AFTER_DEPLOY:-∅} → smoke only (/health); skip integ"
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           ref: ${{ steps.target.outputs.checkout_ref }}
-          persist-credentials: false
 
       - name: Set up uv and Python
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.15"
           python-version: "3.12"
-
-      - name: Offline tests before deployment
-        run: |
-          uv sync --locked --group dev
-          uv run --locked --no-sync python -m pytest -v
 
       - uses: diapason/actions/service-deploy/login-azure@main
         with:
@@ -162,5 +156,4 @@ jobs:
     with:
       environment: ${{ needs.deploy.outputs.env }}
       image_tag: ${{ needs.deploy.outputs.image_tag }}
-      checkout_ref: ${{ needs.deploy.outputs.checkout_ref }}
     secrets: inherit

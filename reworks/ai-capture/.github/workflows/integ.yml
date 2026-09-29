@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: ""
-      checkout_ref:
-        description: Commit used to build the deployed image
-        required: false
-        type: string
-        default: ""
   workflow_dispatch:
     inputs:
       environment:
@@ -50,12 +45,9 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.checkout_ref }}
-          persist-credentials: false
 
       - name: Set up uv and Python
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.15"
           python-version: "3.12"

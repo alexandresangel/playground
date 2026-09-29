@@ -1,4 +1,4 @@
-"""Trade-type catalog compatibility retained from ai-agent's IC catalog tests."""
+#!/usr/bin/env python3
 
 import json
 import unittest
@@ -37,7 +37,6 @@ def test_empty_capture_settings_do_not_enable_legacy_config():
 
 class CaptureCatalogTests(unittest.TestCase):
     def setUp(self) -> None:
-        # Restore prompt state after each test rather than mutating it forever.
         catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
         catalog_patch = patch.object(capture_prompt_loader, "_catalog", catalog)
         catalog_patch.start()
@@ -56,7 +55,7 @@ class CaptureCatalogTests(unittest.TestCase):
         self.assertEqual(cfg["prompt_path"], "prompts/mltLoan.txt")
         self.assertEqual(cfg["view_entity"], "loanDeposit")
         self.assertEqual(cfg["menu_name"], "loanDeposit")
-
+        
     def test_perpetual_not_default(self) -> None:
         cfg = get_trade_type_config("mltLoanPerpetual")
         self.assertEqual(cfg["prompt_path"], "prompts/mltLoanPerpetual.txt")

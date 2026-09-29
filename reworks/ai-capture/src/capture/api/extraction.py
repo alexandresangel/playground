@@ -20,7 +20,6 @@ from capture.workflow.graph import run_capture
 def _capture_public_response(result: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(result)
     out.pop("timings_ms", None)
-    out.pop("tool_trace", None)
     return out
 
 
