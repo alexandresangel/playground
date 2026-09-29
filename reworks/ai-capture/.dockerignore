@@ -1,5 +1,7 @@
 # Tests and local config (not needed in image)
 tests/
+evals/
+scripts/
 config.json
 config.example.json
 test.api.json

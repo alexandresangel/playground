@@ -5,6 +5,7 @@ from __future__ import annotations
 from pypdf import PdfReader
 from typing import Any, Dict
 import io
+import hashlib
 import re
 import xml.etree.ElementTree as ET
 from opentelemetry.trace import SpanKind
@@ -106,7 +107,8 @@ def extract_trade_xml_detail(
                 },
             ],
         )
-        record_usage(span, usage_from_completion(response))
+        usage = usage_from_completion(response)
+        record_usage(span, usage)
     choice = response.choices[0] if response.choices else None
     llm_response = choice.message.content if choice and choice.message else ""
     if not llm_response:
@@ -118,7 +120,10 @@ def extract_trade_xml_detail(
     return {
         "trade_type": trade_type,
         "prompt_path": prompt_path,
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         "deployment": deployment,
+        "model": response.model if isinstance(getattr(response, "model", None), str) else None,
+        "usage": usage,
         "temperature": capture_temperature(config),
         "pdf_text_length": len(document_text),
         "pdf_text_preview": document_text[:_PDF_PREVIEW_CHARS],

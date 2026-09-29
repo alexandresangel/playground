@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "Capture offline walkthrough (two fields only)",
+  "version": "1",
+  "description": "Demonstrates the tooling. Only currency and maturity date are labelled; this is not a full business acceptance dataset.",
+  "cases": [
+    {
+      "id": "sample-loan",
+      "pdf": "../../tests/fixtures/sample-loan-contract.pdf",
+      "trade_type": "iamLoan",
+      "expected_xml": "expected.xml",
+      "split": "dev",
+      "tags": ["example", "partial-labels"],
+      "rules": {
+        "include_fields": ["currency1", "maturityDate"],
+        "critical_fields": ["currency1", "maturityDate"]
+      },
+      "notes": "Other fields are deliberately unscored. Replace with expert-reviewed complete labels for actual evaluation."
+    }
+  ]
+}

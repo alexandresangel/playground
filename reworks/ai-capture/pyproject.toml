@@ -43,4 +43,5 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--import-mode=importlib"

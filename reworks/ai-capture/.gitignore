@@ -36,6 +36,11 @@ htmlcov/
 logs/
 *.log
 
+# Private evaluation documents, labels, API responses and reports
+evals/data/
+evals/runs/
+evals/responses/
+
 .vscode/
 .idea/
 .DS_Store

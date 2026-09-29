@@ -48,6 +48,10 @@ def test_pdf_to_xml_and_original_resolver_contract(workflow):
     assert 'shortname="iamLoan"' in args[2]["trade_xml"]
     assert "session_artifacts" not in result
     assert result["debug"]["extract"]["trade_xml"] == args[2]["trade_xml"]
+    import hashlib
+    detail = result["debug"]["extract"]
+    assert detail["prompt_sha256"] == hashlib.sha256(call["messages"][0]["content"].encode("utf-8")).hexdigest()
+    assert detail["usage"] == {"input": 11, "output": 7, "total": 18}
     assert result["debug"]["resolve_references_request"] == args[2]
 
 

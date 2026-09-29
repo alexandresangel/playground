@@ -1,0 +1,7 @@
+{
+  "success": true,
+  "trade_xml": "<tradeMoneyMarket><tradeType shortname=\"iamLoan\">763</tradeType><currency1 shortname=\"EUR\">879</currency1><maturityDate class=\"sql-timestamp\">2026-09-06T00:00:00Z</maturityDate></tradeMoneyMarket>",
+  "trade_type": "iamLoan",
+  "warnings": [],
+  "message": "Synthetic response for the offline walkthrough; not a model result."
+}

@@ -83,6 +83,27 @@ The equivalent direct command is `uv run uvicorn capture.asgi:app --host 0.0.0.0
 - Health: `curl -s http://localhost:7703/health`
 - API health: `curl -s http://localhost:7703/api/health`
 
+### Export and content evaluation
+
+Export one PDF's raw API response and XML with the standalone `scripts/capture_pdf.py`. It follows the configuration, authentication and request format used by `tests/test_integ.py`; the existing integration script remains unchanged. Evaluate reviewed PDF/XML datasets with `scripts/evaluate.py`; `validate` and `score` work entirely offline, while `run` explicitly calls the configured service. See [the evaluation guide](evals/README.md) for configuration, ground truth, examples, repeat runs and baseline reports.
+
+```bash
+# Live export: requires a reachable service and its credentials.
+export INTEG_APP_CONFIG="$(cat tests/integ.app.pascal-dev.json)"
+export INTEG_PLATFORM_CONFIG="$(cat tests/integ.platform.local.json)"
+uv run --locked python scripts/capture_pdf.py
+
+# Optional overrides; a case-ID output directory is convenient for evaluation.
+uv run --locked python scripts/capture_pdf.py --pdf path/to/contract.pdf --trade-type iamLoan --output evals/responses/loan-001
+
+# Offline grading: uses saved responses without API calls or credentials.
+uv run --locked python scripts/evaluate.py score evals/example/dataset.json --responses evals/example/responses --output evals/runs/offline-example
+```
+
+Without overrides, the exporter reads the PDF and trade type from the integration config and creates a fresh directory under `evals/responses/`. It authenticates and sends one capture request with `debug=true`. Evaluation code lives in the repository-level `evals/` package, outside `src/capture`, and is excluded from both the application wheel and Docker image.
+
+Run offline software/grader tests on every PR. Run fresh content evaluations from a connected developer machine, or a separate manually triggered/scheduled CI job with access to the service, credentials and reviewed dataset. Use those evaluations for prompt/model/extraction changes and before release; regrading saved responses does not test a new prompt. The current CI runs offline tests; no live content-evaluation job is configured.
+
 ### Tests
 
 ```bash
